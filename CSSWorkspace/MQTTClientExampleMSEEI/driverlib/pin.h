@@ -164,7 +164,7 @@ extern void PinTypeI2S(unsigned long ulPin,unsigned long ulPinMode);
 extern void PinTypeTimer(unsigned long ulPin,unsigned long ulPinMode);
 extern void PinTypeCamera(unsigned long ulPin,unsigned long ulPinMode);
 extern void PinTypeGPIO(unsigned long ulPin,unsigned long ulPinMode,
-                        tBoolean bOpenDrain);
+                        unsigned char bOpenDrain);
 extern void PinTypeADC(unsigned long ulPin,unsigned long ulPinMode);
 extern void PinTypeSDHost(unsigned long ulPin,unsigned long ulPinMode);
 

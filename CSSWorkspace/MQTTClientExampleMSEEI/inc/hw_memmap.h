@@ -47,8 +47,8 @@
 #define WDT_BASE                0x40000000
 #define GPIOA0_BASE             0x40004000
 #define GPIOA1_BASE             0x40005000
-#define GPIOA2_BASE             0x40006000
 #define GPIOA3_BASE             0x40007000
+#define GPIOA2_BASE             0x40006000
 #define GPIOA4_BASE             0x40024000 
 #define UARTA0_BASE             0x4000C000
 #define UARTA1_BASE             0x4000D000
