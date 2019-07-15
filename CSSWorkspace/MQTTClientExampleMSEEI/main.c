@@ -17,20 +17,6 @@
 //*****************************************************************************
 //
 //*****************************************************************************
-//
-// Application Name     -   MQTT Client
-// Application Overview -   This application acts as a MQTT client and connects
-//                          to the IBM MQTT broker, simultaneously we can
-//                          connect a web client from a web browser. Both
-//                          clients can inter-communicate using appropriate
-//                          topic names.
-//
-// Application Details  -
-// http://processors.wiki.ti.com/index.php/CC32xx_MQTT_Client
-// or
-// docs\examples\CC32xx_MQTT_Client.pdf
-//
-//*****************************************************************************
 
 //*****************************************************************************
 //
@@ -81,9 +67,8 @@
 #include "tmp006drv.h"
 #include "bma222drv.h"
 #include "moistureSensor.h"
-#include "ultrasonicSensor.h"
 
-//FreRTOS
+//FreeRTOS
 #include"FreeRTOS.h"
 
 #include "event_groups.h"               // Libreria de grupos de eventos
@@ -95,7 +80,7 @@
 // application specific includes
 #include "pinmux.h"
 
-#include "frozen.h" // JSON
+#include "frozen.h" //Cabecera JSON
 
 #define APPLICATION_VERSION 	"1.1.1"
 
@@ -131,7 +116,7 @@
 #define RETAIN                  1
 
 /*Topics a los que va a publicar*/
-#define PUB_TOPIC_MOISTURE       "/cc3200/MOITURE"
+#define PUB_TOPIC_MOISTURE_SENSOR  "/cc3200/MoistureSensor"
 
 /*Numero de topics a los que se va a subscribir*/
 #define TOPIC_COUNT             1
@@ -143,6 +128,7 @@
 //#define TOPIC3                  "/cc3200/ToggleLEDCmdL3"
 //#define TOPIC_PING              "/cc3200/PING"
 //#define TOPIC_JSON              "/cc3200/LEDs"
+
 
 
 
@@ -174,22 +160,22 @@ typedef struct connection_config{
 
 typedef enum events
 {
-    MOISTURE_REPORT,        // Reporta el valor de humedad
+    MOISTURE_REPORT,                         // Manda los valores de aceleracion
     BROKER_DISCONNECTION
 }osi_messages;
 
 #ifdef USE_FREERTOS
 void vUARTTask( void *pvParameters );
-#endif // USE_FREERTOS
+#endif
 
 
 /////////////////////////////////////////////////////
 
-static EventGroupHandle_t MoistureMeasure;                  // Grupo de evento que controlará cuando se arranca la medicion de humedad en suelo
-#define MEASURE_RDY          0x0001
+static EventGroupHandle_t moistureMeasures;                  // Grupo de evento que controlará cuando se arranca la medicion de aceleracion
+#define MOISTURE_READY          0x0001
 
 
-
+// TBDeleted!
 typedef struct {                                    // Struct para almacenar los valores de pwm de los tres leds
     unsigned long red ;
     unsigned long green;
@@ -225,7 +211,7 @@ void LedTimerDeinitStop();
 void BoardInit(void);
 static void DisplayBanner(char * AppName);
 void ConnectWiFI(void *pvParameters);
-void moistureTask(void *pvParameters);                   // Tarea que envia el estado de la humedad
+void moistureTask(void *pvParameters);                   // Tarea que envia el estado de la acceleracion
 
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- Start
@@ -288,9 +274,7 @@ SlMqttClientLibCfg_t Mqtt_Client={
 };
 
 /*Conversion a char* de los topics en los que publicaremos*/
-
-const char *pub_topic_moisture = PUB_TOPIC_MOISTURE;
-
+const char *pub_topic_moisture_sensor = PUB_TOPIC_MOISTURE_SENSOR;
 
 
 void *app_hndl = (void*)usr_connect_config;
@@ -321,28 +305,114 @@ Mqtt_Recv(void *app_hndl, const char  *topstr, long top_len, const void *payload
                        long pay_len, bool dup,unsigned char qos, bool retain)
 {
     
-	//bool booleano;
-	//float value;
+	bool booleano;
+	float value;
     char *output_str=(char*)pvPortMalloc(top_len+1);
     memset(output_str,'\0',top_len+1);
     strncpy(output_str, (char*)topstr, top_len);
     output_str[top_len]='\0';
     if (strncmp(output_str,TOPIC_PC, top_len) == 0)
 	{
+        /*
+        if (json_scanf((const char *)payload, pay_len, "{ mode: %d }", &config.mode)>0)         // Si recibimos un mensaje de cambio de modo
+        {
+            switch(config.mode)                                                                 // Fijamos el modo y realizamos las configuraciones necesarias
+            {
+                case 0:
+                    PWM_IF_OutputDisable();                                                     // Modo PWM deshabilitado
+                    UART_PRINT("\n\rMODE: GPIO");
+                    break;
+                case 1:
+                    PWM_IF_OutputEnable();                                                      // Modo PWM habilitado
+                    PWM_IF_SetDutycycle(config.pwmValues.red, config.pwmValues.green, config.pwmValues.orange);
+                    UART_PRINT("\n\rMODE: PWM");
+                    break;
+                case 2:
+                    MAP_PinTypeI2C(PIN_01, PIN_MODE_1);                                          // Se configura el pin PIN_01 para  I2C (I2C_SCL)
+                    MAP_PinTypeI2C(PIN_02, PIN_MODE_1);                                          // Se configura el pin PIN_02 para  I2C (I2C_SDA)
+                    UART_PRINT("\n\rMODE: I2C");
+                    break;
+                default:
+                    UART_PRINT("\n\r INCORRECT MODE");
+                    break;
+            }
+        }
+        if (json_scanf((const char *)payload, pay_len, "{ ping: %B }", &booleano)>0)            // Si recibimos un mensaje de ping
+        {
+            osi_messages var = PING_REPORT;
+            osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);                                     // Pone en la cola de mensajes a enviar un mensaje del tipo PING REPORT
+        }
+        if (json_scanf((const char *)payload, pay_len, "{ checkButtonsAsync: %B }", &booleano)>0)   // Configura el modo de lectura de botones asincrono
+        {
+            UART_PRINT("\n\r modeAsync: %d",booleano);
+            config.modeAsync = booleano;
+        }
 
-
-        if (json_scanf((const char *)payload, pay_len, "{ moisture: %B }", &config.accStarted)>0)   // Configura el arranque de la medicion de aceleraccion
+        if (json_scanf((const char *)payload, pay_len, "{ accStart: %B }", &config.accStarted)>0)   // Configura el arranque de la medicion de aceleraccion
         {
             if(config.accStarted)                                                                   // Si recibimos un true, ponemos el flag ACC ON
             {
-                xEventGroupSetBits(MoistureMeasure,MEASURE_RDY);
+                xEventGroupSetBits(FlagAcc,ACC_ON);
                 config.freqAcc = 0.1;
             }
             else                                                                                    // Si recibimos un false, borramos ese flag
             {
-                xEventGroupClearBits(MoistureMeasure,MEASURE_RDY);
+                xEventGroupClearBits(FlagAcc,ACC_ON);
             }
         }
+        if (json_scanf((const char *)payload, pay_len, "{ accFreq: %f }", &config.freqAcc)>0)       // Si recibimos la frecuencia a la que hay que medir la aceleraccion, solo la alamacenamos en la variable destinada a eso
+        {
+
+        }
+        if(config.mode == 0)                                                                        // Si estamos en modo GPIO
+        {
+            if (json_scanf((const char *)payload, pay_len, "{ redLed: %B }", &booleano)>0)          // Y recibimos el comando redLed encenemos/apagamos el led en funcion de lo recibido
+            {
+
+                if (booleano)
+                    GPIO_IF_LedOn(MCU_RED_LED_GPIO);
+                else
+                    GPIO_IF_LedOff(MCU_RED_LED_GPIO);
+
+            }
+            if (json_scanf((const char *)payload, pay_len, "{ orangeLed: %B }", &booleano)>0)       // Y recibimos el comando orangeLed encenemos/apagamos el led en funcion de lo recibido
+            {
+
+                if (booleano)
+                    GPIO_IF_LedOn(MCU_ORANGE_LED_GPIO);
+                else
+                    GPIO_IF_LedOff(MCU_ORANGE_LED_GPIO);
+
+            }
+            if (json_scanf((const char *)payload, pay_len, "{ greenLed: %B }", &booleano)>0)        // Y recibimos el comando greenLed encenemos/apagamos el led en funcion de lo recibido
+            {
+
+                if (booleano)
+                    GPIO_IF_LedOn(MCU_GREEN_LED_GPIO);
+                else
+                    GPIO_IF_LedOff(MCU_GREEN_LED_GPIO);
+
+            }
+        }
+        if(config.mode == 1)                                                                        // Si estamos en modo PWM
+        {
+            if (json_scanf((const char *)payload, pay_len, "{ pwmRed: %f }", &value)>0)             // Al recibir el valor de cualquier led, llamamos a la funcion con los valores actualizados
+            {
+                config.pwmValues.red = value*65524;
+                PWM_IF_SetDutycycle(config.pwmValues.red,  config.pwmValues.orange, config.pwmValues.green);
+            }
+            if (json_scanf((const char *)payload, pay_len, "{ pwmGreen: %f }", &value)>0)
+            {
+                config.pwmValues.green =value*65524;
+                PWM_IF_SetDutycycle(config.pwmValues.red,  config.pwmValues.orange, config.pwmValues.green);
+            }
+            if (json_scanf((const char *)payload, pay_len, "{ pwmOrange: %f }", &value)>0)
+            {
+                config.pwmValues.orange = value*65524;
+                PWM_IF_SetDutycycle(config.pwmValues.red,  config.pwmValues.orange, config.pwmValues.green);
+            }
+        }
+        */
 
 
 	}
@@ -459,7 +529,7 @@ sl_MqttDisconnect(void *app_hndl)
 //****************************************************************************
 void Button1_ISR (void)
 {
-
+    /*
 	uint32_t status;
 	BaseType_t xHigherPriorityTaskWoken=pdFALSE;
     UtilsDelay(8000);	        //antirrebote Sw "cutre", gasta tiempo de CPU ya que las interrupciones tienen prioridad sobre las tareas
@@ -471,7 +541,7 @@ void Button1_ISR (void)
 
     GPIOIntClear(GPIOA1_BASE,status);                                       // Limpiamos la interrupcion
     portYIELD_FROM_ISR( xHigherPriorityTaskWoken );                         // Miramos si hay otra tarea de mayor prioridad
-
+    */
 }
 
 //****************************************************************************
@@ -488,6 +558,7 @@ void Button1_ISR (void)
 
 void Button2_ISR (void)
 {
+    /*
 	uint32_t status;
     BaseType_t xHigherPriorityTaskWoken=pdFALSE;
 	UtilsDelay(8000);	//antirrebote Sw "cutre", gasta tiempo de CPU ya que las interrupciones tienen prioridad sobre las tareas
@@ -499,6 +570,7 @@ void Button2_ISR (void)
 
 	GPIOIntClear(GPIOA2_BASE,status);                       // Limpiamos la interrupcion
     portYIELD_FROM_ISR( xHigherPriorityTaskWoken );         // Miramos si hay otra tarea de mayor prioridad
+    */
 }
 //------------------------------------------------------------ -----------------------
 
@@ -506,6 +578,7 @@ void Button2_ISR (void)
 //Initialze Buttons and ISR
 void ButtonsInit(void)
 {
+    /*
 	//Los puertos GPIO1 y 2 ya han sido habilitados en la función PinMuxConfig, por lo que no tengo que hacerlo aqui
 	// Aqui activamos las interrupciones e instalamos los manejadores de interrupción
 	//
@@ -523,6 +596,7 @@ void ButtonsInit(void)
 	GPIOIntClear(GPIOA2_BASE,GPIO_PIN_6);
 	GPIOIntEnable(GPIOA2_BASE,GPIO_INT_PIN_6);
 	IntEnable(INT_GPIOA2);
+	*/
 
 }
 
@@ -691,8 +765,6 @@ void BoardInit(void)
 
     PRCMCC3200MCUInit();
 }
-
-
 
 //*****************************************************************************
 //
@@ -1129,14 +1201,17 @@ void ConnectWiFI(void *pvParameters)
    	 while (1);
     }
 
-    osi_Sleep(10);
+    osi_Sleep(10); //Espera un poco
 
+
+    //Esto tiene que ser realizado en una tarea. De momento lo pongo aqui
     //Init Temperature Sensor
     if(TMP006DrvOpen() < 0)
     {
     	UARTprintf("TMP006 open error\n");
     }
 
+    //Esto tiene que ser realizado en una tarea. De momento lo pongo aqui
     //Init Accelerometer Sensor
     if(BMA222Open() < 0)
     {
@@ -1161,7 +1236,7 @@ void ConnectWiFI(void *pvParameters)
     //
     // Display Application Banner
     //
-    DisplayBanner("MQTT_Client");
+    DisplayBanner("TFM - Sergio Gasquez");
    
     //
     // Init Push Button, enable ISRs
@@ -1312,18 +1387,19 @@ void ConnectWiFI(void *pvParameters)
         osi_MsgQRead( &g_PBQueue, &RecvQue, OSI_WAIT_FOREVER);                  // Funcion bloqueante que espera a que haya algun mensaje en la cola de salida
                                                                                 // Cuando llega algun mensaje lo guardamos en RecvQue
         // Comrpobamosque tipo de mensaje es
-        if(MOISTURE_REPORT == RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
-
+        if(MOISTURE_REPORT== RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
         {
-            struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+            /*
+             struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
             int8_t x_acc,y_acc,z_acc;
             BMA222ReadNew(&x_acc, &y_acc, &z_acc);
             json_printf(&out1,"{ x_acc : %d,  y_acc : %d, z_acc : %d}", (int)x_acc, (int)y_acc, (int)z_acc);
             sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                             pub_topic_moisture,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+                             pub_topic_acc,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
             UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-            UART_PRINT("Topic: %s\n\r",pub_topic_moisture);
+            UART_PRINT("Topic: %s\n\r",pub_topic_acc);
             UART_PRINT("Data: %s\n\r",json_buffer);
+            */
         }
         else if(BROKER_DISCONNECTION == RecvQue)    // Si es porque se ha producido una desconexion se termina
         {
@@ -1364,19 +1440,14 @@ end:
  */
 void moistureTask (void *pvParameters)
 {
-
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-        /*
-        uint16_t res;
-        res = analogReadMoisture();
-        float voltage;
-        voltage = res*(1.467/4096);
-        UART_PRINT("\n Code: %u   Voltage: %f",(unsigned)res,voltage);
+        uint32_t sample = 0;
+        sample = analogReadMoisture();
+        double voltage;
+        voltage = sample * (1.467/4096);            // Calcular si es 4096 o 4095
+        UART_PRINT("\n Code: %lu   Voltage: %f", sample,voltage);
         osi_Sleep(3000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
-        */
-        analogReadWaterLevel();
-        osi_Sleep(3000);
     }
 
 
@@ -1405,7 +1476,7 @@ void moistureTask (void *pvParameters)
 
 
 void main()
-{ 
+{
     long lRetVal = -1;
 
     //
@@ -1418,6 +1489,7 @@ void main()
     //
     PinMuxConfig();
 
+    setupAdc();
     //
     // Configuring UART
     //
@@ -1462,8 +1534,8 @@ void main()
     }
 
 
-    MoistureMeasure = xEventGroupCreate();              // Crear el grupo de eventos para la aceleracion
-    if( MoistureMeasure == NULL )
+    moistureMeasures = xEventGroupCreate();              // Crear el grupo de eventos para la aceleracion
+    if( moistureMeasures == NULL )
     {
        while(1);
     }

@@ -6,6 +6,7 @@
 #include "adc.h"
 #include "hw_memmap.h"
 #include "hw_types.h"
+#include "uart_if.h"
 
 #define MOISTURE_SENSOR_PIN PIN_59
 
@@ -14,8 +15,8 @@ extern "C"
 {
 #endif
 
-
-uint16_t analogReadMoisture();
+void setupAdc();
+uint32_t analogReadMoisture();
 
 
 
