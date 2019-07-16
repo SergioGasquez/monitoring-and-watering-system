@@ -1,2 +1,4 @@
-# TFM- Self Irrigation Plant!
- Final master project: A self irrigation plant which runs on a CC3200 and uses MQQT as comunication protocol
+# Thronix- A monitoring and watering system!
+ Final master project: A  monitoring and self irrigation system which runs on a CC3200 and uses MQQT as comunication protocol. 
+ 
+ WIP
