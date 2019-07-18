@@ -67,6 +67,7 @@
 #include "tmp006drv.h"
 #include "bma222drv.h"
 #include "moistureSensor.h"
+#include "waterLevelSensor.h"
 
 //FreeRTOS
 #include"FreeRTOS.h"
@@ -1236,7 +1237,7 @@ void ConnectWiFI(void *pvParameters)
     //
     // Display Application Banner
     //
-    DisplayBanner("TFM - Sergio Gasquez");
+    DisplayBanner("TFM - Sergio Gasquez")
    
     //
     // Init Push Button, enable ISRs
@@ -1442,15 +1443,14 @@ void moistureTask (void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-        uint32_t sample = 0;
-        sample = analogReadMoisture();
-        double voltage;
-        voltage = sample * (1.467/4096);            // Calcular si es 4096 o 4095
-        UART_PRINT("\n Code: %lu   Voltage: %f", sample,voltage);
+//        uint32_t sample = 0;
+//        sample = analogReadMoisture();
+//        double voltage;
+//        voltage = sample * (1.467/4096);            // Calcular si es 4096 o 4095
+//        UART_PRINT("\n Code: %lu   Voltage: %f", sample,voltage);
+        readWaterLevel();
         osi_Sleep(3000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
     }
-
-
 }
 
 

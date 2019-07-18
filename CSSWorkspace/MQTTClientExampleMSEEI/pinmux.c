@@ -43,10 +43,16 @@ PinMuxConfig(void)
     MAP_PRCMPeripheralClkEnable(PRCM_UARTA0, PRCM_RUN_MODE_CLK);
 
     //
-    // Configure PIN_64 for GPIOOutput
+    // Configure PIN_64 for GPIOOutput (Trigger)
     //
     MAP_PinTypeGPIO(PIN_64, PIN_MODE_0, false);
     MAP_GPIODirModeSet(GPIOA1_BASE, 0x2, GPIO_DIR_MODE_OUT);
+
+    //
+    // Configure PIN_08 for GPIO Input (Echo)
+    //
+    MAP_PinTypeGPIO(PIN_08, PIN_MODE_0, false);
+    MAP_GPIODirModeSet(GPIOA2_BASE, 0x2, GPIO_DIR_MODE_IN);
 
     //
     // Configure PIN_01 for GPIOOutput
@@ -83,10 +89,9 @@ PinMuxConfig(void)
     MAP_PinTypeUART(PIN_57, PIN_MODE_3);
 
     //
-    // Configure PIN_59 for UART0 UART0_RX
+    // Configure PIN_59 for Moisture Sensor
     //
     MAP_PinTypeGPIO(PIN_59, PIN_MODE_0, false);
     MAP_GPIODirModeSet(GPIOA0_BASE, 0x10, GPIO_DIR_MODE_IN);
-    MAP_PinTypeADC(PIN_59, PIN_MODE_0);
 
 }
