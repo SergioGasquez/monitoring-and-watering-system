@@ -83,7 +83,7 @@
 
 #include "frozen.h" //Cabecera JSON
 
-#define APPLICATION_VERSION 	"1.1.1"
+#define APPLICATION_VERSION     "1.1.1"
 
 /*Operate Lib in MQTT 3.1 mode.*/
 #define MQTT_3_1_1              false /*MQTT 3.1.1 */
@@ -172,7 +172,14 @@ void vUARTTask( void *pvParameters );
 
 /////////////////////////////////////////////////////
 
-static EventGroupHandle_t moistureMeasures;                  // Grupo de evento que controlará cuando se arranca la medicion de aceleracion
+int echowait = 0;
+volatile int pulse= 0;
+
+//static EventGroupHandle_t waterLevelMeasures;                  // Grupo de evento que controlarï¿½ cuando se arranca la medicion de aceleracion
+//#define WAITING_ECHO          0x0001
+
+
+static EventGroupHandle_t moistureMeasures;                  // Grupo de evento que controlarï¿½ cuando se arranca la medicion de aceleracion
 #define MOISTURE_READY          0x0001
 
 
@@ -213,6 +220,7 @@ void BoardInit(void);
 static void DisplayBanner(char * AppName);
 void ConnectWiFI(void *pvParameters);
 void moistureTask(void *pvParameters);                   // Tarea que envia el estado de la acceleracion
+void waterLevelTask(void *pvParameters);
 
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- Start
@@ -300,20 +308,20 @@ void *app_hndl = (void*)usr_connect_config;
 //!\return none
 //****************************************************************************
 
-// Funcioón que se ejecuta cuando recibimos un mensaje
+// Funcioï¿½n que se ejecuta cuando recibimos un mensaje
 static void
 Mqtt_Recv(void *app_hndl, const char  *topstr, long top_len, const void *payload,
                        long pay_len, bool dup,unsigned char qos, bool retain)
 {
     
-	bool booleano;
-	float value;
+    bool booleano;
+    float value;
     char *output_str=(char*)pvPortMalloc(top_len+1);
     memset(output_str,'\0',top_len+1);
     strncpy(output_str, (char*)topstr, top_len);
     output_str[top_len]='\0';
     if (strncmp(output_str,TOPIC_PC, top_len) == 0)
-	{
+    {
         /*
         if (json_scanf((const char *)payload, pay_len, "{ mode: %d }", &config.mode)>0)         // Si recibimos un mensaje de cambio de modo
         {
@@ -416,7 +424,7 @@ Mqtt_Recv(void *app_hndl, const char  *topstr, long top_len, const void *payload
         */
 
 
-	}
+    }
     // Publicamos por la consola el mensaje publicado
     UART_PRINT("\n\rPublish Message Received");
     UART_PRINT("\n\rTopic: ");
@@ -531,10 +539,10 @@ sl_MqttDisconnect(void *app_hndl)
 void Button1_ISR (void)
 {
     /*
-	uint32_t status;
-	BaseType_t xHigherPriorityTaskWoken=pdFALSE;
-    UtilsDelay(8000);	        //antirrebote Sw "cutre", gasta tiempo de CPU ya que las interrupciones tienen prioridad sobre las tareas
-    						    //Por simplicidad lo dejamos así...
+    uint32_t status;
+    BaseType_t xHigherPriorityTaskWoken=pdFALSE;
+    UtilsDelay(8000);           //antirrebote Sw "cutre", gasta tiempo de CPU ya que las interrupciones tienen prioridad sobre las tareas
+                                //Por simplicidad lo dejamos asï¿½...
 
     status =  GPIOIntStatus(GPIOA1_BASE,1);     // Comprobamos el estado de la interrupcion del pin
 
@@ -560,16 +568,16 @@ void Button1_ISR (void)
 void Button2_ISR (void)
 {
     /*
-	uint32_t status;
+    uint32_t status;
     BaseType_t xHigherPriorityTaskWoken=pdFALSE;
-	UtilsDelay(8000);	//antirrebote Sw "cutre", gasta tiempo de CPU ya que las interrupciones tienen prioridad sobre las tareas
-	//Por simplicidad lo dejamos así...
+    UtilsDelay(8000);   //antirrebote Sw "cutre", gasta tiempo de CPU ya que las interrupciones tienen prioridad sobre las tareas
+    //Por simplicidad lo dejamos asï¿½...
 
-	status =  GPIOIntStatus(GPIOA2_BASE,1);         // Comprobamos el estado de la interrupcion del pin
+    status =  GPIOIntStatus(GPIOA2_BASE,1);         // Comprobamos el estado de la interrupcion del pin
 
 
 
-	GPIOIntClear(GPIOA2_BASE,status);                       // Limpiamos la interrupcion
+    GPIOIntClear(GPIOA2_BASE,status);                       // Limpiamos la interrupcion
     portYIELD_FROM_ISR( xHigherPriorityTaskWoken );         // Miramos si hay otra tarea de mayor prioridad
     */
 }
@@ -580,24 +588,24 @@ void Button2_ISR (void)
 void ButtonsInit(void)
 {
     /*
-	//Los puertos GPIO1 y 2 ya han sido habilitados en la función PinMuxConfig, por lo que no tengo que hacerlo aqui
-	// Aqui activamos las interrupciones e instalamos los manejadores de interrupción
-	//
-	GPIOIntTypeSet(GPIOA1_BASE,GPIO_PIN_5,GPIO_FALLING_EDGE); //Configura flanco de bajada en el PIN5
-	IntPrioritySet(INT_GPIOA1, configMAX_SYSCALL_INTERRUPT_PRIORITY); //Configura la prioridad de la ISR
-	GPIOIntRegister(GPIOA1_BASE, Button1_ISR); //Registra Button1_ISR como rutina de interrupción del puerto
-	GPIOIntClear(GPIOA1_BASE,GPIO_PIN_5); //Borra el flag de interrupcion
-	GPIOIntEnable(GPIOA1_BASE,GPIO_INT_PIN_5); //Habilita la interrupcion del PIN
-	IntEnable(INT_GPIOA1); //Habilita la interrupcion del puerto
+    //Los puertos GPIO1 y 2 ya han sido habilitados en la funciï¿½n PinMuxConfig, por lo que no tengo que hacerlo aqui
+    // Aqui activamos las interrupciones e instalamos los manejadores de interrupciï¿½n
+    //
+    GPIOIntTypeSet(GPIOA1_BASE,GPIO_PIN_5,GPIO_FALLING_EDGE); //Configura flanco de bajada en el PIN5
+    IntPrioritySet(INT_GPIOA1, configMAX_SYSCALL_INTERRUPT_PRIORITY); //Configura la prioridad de la ISR
+    GPIOIntRegister(GPIOA1_BASE, Button1_ISR); //Registra Button1_ISR como rutina de interrupciï¿½n del puerto
+    GPIOIntClear(GPIOA1_BASE,GPIO_PIN_5); //Borra el flag de interrupcion
+    GPIOIntEnable(GPIOA1_BASE,GPIO_INT_PIN_5); //Habilita la interrupcion del PIN
+    IntEnable(INT_GPIOA1); //Habilita la interrupcion del puerto
 
-	//Igual configuracion para el otro boton (PIN6 del puerto 2).
-	GPIOIntTypeSet(GPIOA2_BASE,GPIO_PIN_6,GPIO_FALLING_EDGE);
-	IntPrioritySet(INT_GPIOA2, configMAX_SYSCALL_INTERRUPT_PRIORITY);
-	GPIOIntRegister(GPIOA2_BASE, Button2_ISR);
-	GPIOIntClear(GPIOA2_BASE,GPIO_PIN_6);
-	GPIOIntEnable(GPIOA2_BASE,GPIO_INT_PIN_6);
-	IntEnable(INT_GPIOA2);
-	*/
+    //Igual configuracion para el otro boton (PIN6 del puerto 2).
+    GPIOIntTypeSet(GPIOA2_BASE,GPIO_PIN_6,GPIO_FALLING_EDGE);
+    IntPrioritySet(INT_GPIOA2, configMAX_SYSCALL_INTERRUPT_PRIORITY);
+    GPIOIntRegister(GPIOA2_BASE, Button2_ISR);
+    GPIOIntClear(GPIOA2_BASE,GPIO_PIN_6);
+    GPIOIntEnable(GPIOA2_BASE,GPIO_INT_PIN_6);
+    IntEnable(INT_GPIOA2);
+    */
 
 }
 
@@ -804,262 +812,262 @@ void MqttClientTask(void *pvParameters);
 
 void MqttClientTask(void *pvParameters)
 {
-	long lRetVal = -1;
-	int iCount = 0;
-	    int iNumBroker = 0;
-	    int iConnBroker = 0;
-	    osi_messages RecvQue;
+    long lRetVal = -1;
+    int iCount = 0;
+        int iNumBroker = 0;
+        int iConnBroker = 0;
+        osi_messages RecvQue;
 
-	    connect_config *local_con_conf = (connect_config *)app_hndl;
+        connect_config *local_con_conf = (connect_config *)app_hndl;
 
-	    //
-	    // Initialze MQTT client lib
-	    //
-	    lRetVal = sl_ExtLib_MqttClientInit(&Mqtt_Client);
-	    if(lRetVal != 0)
-	    {
-	        // lib initialization failed
-	        UART_PRINT("MQTT Client lib initialization failed\n\r");
-	        LOOP_FOREVER();
-	    }
+        //
+        // Initialze MQTT client lib
+        //
+        lRetVal = sl_ExtLib_MqttClientInit(&Mqtt_Client);
+        if(lRetVal != 0)
+        {
+            // lib initialization failed
+            UART_PRINT("MQTT Client lib initialization failed\n\r");
+            LOOP_FOREVER();
+        }
 
-	    /******************* connection to the broker ***************************/
-	    iNumBroker = sizeof(usr_connect_config)/sizeof(connect_config);
-	    if(iNumBroker > MAX_BROKER_CONN)
-	    {
-	        UART_PRINT("Num of brokers are more then max num of brokers\n\r");
-	        LOOP_FOREVER();
-	    }
+        /******************* connection to the broker ***************************/
+        iNumBroker = sizeof(usr_connect_config)/sizeof(connect_config);
+        if(iNumBroker > MAX_BROKER_CONN)
+        {
+            UART_PRINT("Num of brokers are more then max num of brokers\n\r");
+            LOOP_FOREVER();
+        }
 
-	    while(iCount < iNumBroker)
-	    {
-	        //create client context
-	        local_con_conf[iCount].clt_ctx =
-	        sl_ExtLib_MqttClientCtxCreate(&local_con_conf[iCount].broker_config,
-	                                      &local_con_conf[iCount].CallBAcks,
-	                                      &(local_con_conf[iCount]));
+        while(iCount < iNumBroker)
+        {
+            //create client context
+            local_con_conf[iCount].clt_ctx =
+            sl_ExtLib_MqttClientCtxCreate(&local_con_conf[iCount].broker_config,
+                                          &local_con_conf[iCount].CallBAcks,
+                                          &(local_con_conf[iCount]));
 
-	        //
-	        // Set Client ID
-	        //
-	        sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
-	                            SL_MQTT_PARAM_CLIENT_ID,
-	                            local_con_conf[iCount].client_id,
-	                            strlen((char*)(local_con_conf[iCount].client_id)));
+            //
+            // Set Client ID
+            //
+            sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
+                                SL_MQTT_PARAM_CLIENT_ID,
+                                local_con_conf[iCount].client_id,
+                                strlen((char*)(local_con_conf[iCount].client_id)));
 
-	        //
-	        // Set will Params
-	        //
-	        if(local_con_conf[iCount].will_params.will_topic != NULL)
-	        {
-	            sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
-	                                    SL_MQTT_PARAM_WILL_PARAM,
-	                                    &(local_con_conf[iCount].will_params),
-	                                    sizeof(SlMqttWill_t));
-	        }
+            //
+            // Set will Params
+            //
+            if(local_con_conf[iCount].will_params.will_topic != NULL)
+            {
+                sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
+                                        SL_MQTT_PARAM_WILL_PARAM,
+                                        &(local_con_conf[iCount].will_params),
+                                        sizeof(SlMqttWill_t));
+            }
 
-	        //
-	        // setting username and password
-	        //
-	        if(local_con_conf[iCount].usr_name != NULL)
-	        {
-	            sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
-	                                SL_MQTT_PARAM_USER_NAME,
-	                                local_con_conf[iCount].usr_name,
-	                                strlen((char*)local_con_conf[iCount].usr_name));
+            //
+            // setting username and password
+            //
+            if(local_con_conf[iCount].usr_name != NULL)
+            {
+                sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
+                                    SL_MQTT_PARAM_USER_NAME,
+                                    local_con_conf[iCount].usr_name,
+                                    strlen((char*)local_con_conf[iCount].usr_name));
 
-	            if(local_con_conf[iCount].usr_pwd != NULL)
-	            {
-	                sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
-	                                SL_MQTT_PARAM_PASS_WORD,
-	                                local_con_conf[iCount].usr_pwd,
-	                                strlen((char*)local_con_conf[iCount].usr_pwd));
-	            }
-	        }
+                if(local_con_conf[iCount].usr_pwd != NULL)
+                {
+                    sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
+                                    SL_MQTT_PARAM_PASS_WORD,
+                                    local_con_conf[iCount].usr_pwd,
+                                    strlen((char*)local_con_conf[iCount].usr_pwd));
+                }
+            }
 
-	        //
-	        // connectin to the broker
-	        //
-	        if((sl_ExtLib_MqttClientConnect((void*)local_con_conf[iCount].clt_ctx,
-	                            local_con_conf[iCount].is_clean,
-	                            local_con_conf[iCount].keep_alive_time) & 0xFF) != 0)
-	        {
-	            UART_PRINT("\n\rBroker connect fail for conn no. %d \n\r",iCount+1);
+            //
+            // connectin to the broker
+            //
+            if((sl_ExtLib_MqttClientConnect((void*)local_con_conf[iCount].clt_ctx,
+                                local_con_conf[iCount].is_clean,
+                                local_con_conf[iCount].keep_alive_time) & 0xFF) != 0)
+            {
+                UART_PRINT("\n\rBroker connect fail for conn no. %d \n\r",iCount+1);
 
-	            //delete the context for this connection
-	            sl_ExtLib_MqttClientCtxDelete(local_con_conf[iCount].clt_ctx);
+                //delete the context for this connection
+                sl_ExtLib_MqttClientCtxDelete(local_con_conf[iCount].clt_ctx);
 
-	            break;
-	        }
-	        else
-	        {
-	            UART_PRINT("\n\rSuccess: conn to Broker no. %d\n\r ", iCount+1);
-	            local_con_conf[iCount].is_connected = true;
-	            iConnBroker++;
-	        }
+                break;
+            }
+            else
+            {
+                UART_PRINT("\n\rSuccess: conn to Broker no. %d\n\r ", iCount+1);
+                local_con_conf[iCount].is_connected = true;
+                iConnBroker++;
+            }
 
-	        //
-	        // Subscribe to topics
-	        //
+            //
+            // Subscribe to topics
+            //
 
-	        if(sl_ExtLib_MqttClientSub((void*)local_con_conf[iCount].clt_ctx,
-	                                   local_con_conf[iCount].topic,
-	                                   local_con_conf[iCount].qos, TOPIC_COUNT) < 0)
-	        {
-	            UART_PRINT("\n\r Subscription Error for conn no. %d\n\r", iCount+1);
-	            UART_PRINT("Disconnecting from the broker\r\n");
-	            sl_ExtLib_MqttClientDisconnect(local_con_conf[iCount].clt_ctx);
-	            local_con_conf[iCount].is_connected = false;
+            if(sl_ExtLib_MqttClientSub((void*)local_con_conf[iCount].clt_ctx,
+                                       local_con_conf[iCount].topic,
+                                       local_con_conf[iCount].qos, TOPIC_COUNT) < 0)
+            {
+                UART_PRINT("\n\r Subscription Error for conn no. %d\n\r", iCount+1);
+                UART_PRINT("Disconnecting from the broker\r\n");
+                sl_ExtLib_MqttClientDisconnect(local_con_conf[iCount].clt_ctx);
+                local_con_conf[iCount].is_connected = false;
 
-	            //delete the context for this connection
-	            sl_ExtLib_MqttClientCtxDelete(local_con_conf[iCount].clt_ctx);
-	            iConnBroker--;
-	            break;
-	        }
-	        else
-	        {
-	            int iSub;
-	            UART_PRINT("Client subscribed on following topics:\n\r");
-	            for(iSub = 0; iSub < local_con_conf[iCount].num_topics; iSub++)
-	            {
-	                UART_PRINT("%s\n\r", local_con_conf[iCount].topic[iSub]);
-	            }
-	        }
-	        iCount++;
-	    }
+                //delete the context for this connection
+                sl_ExtLib_MqttClientCtxDelete(local_con_conf[iCount].clt_ctx);
+                iConnBroker--;
+                break;
+            }
+            else
+            {
+                int iSub;
+                UART_PRINT("Client subscribed on following topics:\n\r");
+                for(iSub = 0; iSub < local_con_conf[iCount].num_topics; iSub++)
+                {
+                    UART_PRINT("%s\n\r", local_con_conf[iCount].topic[iSub]);
+                }
+            }
+            iCount++;
+        }
 
-	    if(iConnBroker < 1)
-	    {
-	        //
-	        // no succesful connection to broker
-	        //
-	        goto end;
-	    }
+        if(iConnBroker < 1)
+        {
+            //
+            // no succesful connection to broker
+            //
+            goto end;
+        }
 
-	    iCount = 0;
+        iCount = 0;
 
-	    for(;;)
-	    {
-	        osi_MsgQRead( &g_PBQueue, &RecvQue, OSI_WAIT_FOREVER);                  // Funcion bloqueante que espera a que haya algun mensaje en la cola de salida
-	        // Cuando llega algun mensaje lo guardamos en RecvQue
-	        // Comrpobamosque tipo de mensaje es
-	        if(PUSH_BUTTON_SW2_PRESSED == RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
-	        {
+        for(;;)
+        {
+            osi_MsgQRead( &g_PBQueue, &RecvQue, OSI_WAIT_FOREVER);                  // Funcion bloqueante que espera a que haya algun mensaje en la cola de salida
+            // Cuando llega algun mensaje lo guardamos en RecvQue
+            // Comrpobamosque tipo de mensaje es
+            if(PUSH_BUTTON_SW2_PRESSED == RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
+            {
 
-	            //
-	            // send publish message
-	            //
-	            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-	                                     pub_topic_sw2,data_sw2,strlen((char*)data_sw2),QOS2,RETAIN);
+                //
+                // send publish message
+                //
+                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                                         pub_topic_sw2,data_sw2,strlen((char*)data_sw2),QOS2,RETAIN);
 
-	            struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));//Reinicio out1, de lo contrario se van acumulando los printfs
+                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));//Reinicio out1, de lo contrario se van acumulando los printfs
 
-	            json_printf(&out1,"{ boton : %B}",false);
-
-
-
-	            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-	                                     pub_topic_json,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-	            UART_PRINT("\n\r CC3200 Publishes the following message \n\r");
-	            UART_PRINT("Topic: %s\n\r",pub_topic_sw2);
-	            UART_PRINT("Data: %s\n\r",data_sw2);
-	        }
-	        else if(PUSH_BUTTON_SW3_PRESSED == RecvQue)     // Si es porque se ha pulsado el boton SW3, se envia el mensaje corresponiente
-	        {
-
-	            //
-	            // send publish message
-	            //
-	            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-	                                     pub_topic_sw3,data_sw3,strlen((char*)data_sw3),QOS2,RETAIN);
-
-	            struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-
-	            //Reinicio out1, de lo contrario se van acumulando los printfs
-
-	            json_printf(&out1,"{ boton : %B}",true);
-
-	            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-	                                     pub_topic_json,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+                json_printf(&out1,"{ boton : %B}",false);
 
 
-	            UART_PRINT("\n\r CC3200 Publishes the following message \n\r");
-	            UART_PRINT("Topic: %s\n\r",pub_topic_sw3);
-	            UART_PRINT("Data: %s\n\r",data_sw3);
-	        }
-	        else if(PING_REPORT == RecvQue)             // Si es porque se debe responder al comando recibido ping, se envia el mensaje  {"ping" : true }
-	        {
-	            bool ping = true;
-	            struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-	            json_printf(&out1,"{ ping : %B}", ping);
-	            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-	                                     pub_topic_ping,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-	            UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-	            UART_PRINT("Topic: %s\n\r",pub_topic_ping);
-	            UART_PRINT("Data: %s\n\r",json_buffer);
-	        }
-	        else if(BUTTON_STATE_REPORT == RecvQue)     // Si es porque se debe reportar el valor de los botones, se comprueba sus estado y se envian
-	        {
-	            struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
 
-	            // Button 1
-	            bool button1 = GPIOPinRead(GPIOA1_BASE,GPIO_PIN_5)>>5;
-	            bool button2 = GPIOPinRead(GPIOA2_BASE,GPIO_PIN_6)>>6;
-	            json_printf(&out1,"{ button1 : %B,  button2 : %B}", button1, button2);
-	            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-	                                     pub_topic_checkButtons,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-	            UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-	            UART_PRINT("Topic: %s\n\r",pub_topic_checkButtons);
-	            UART_PRINT("Data: %s\n\r",json_buffer);
-	        }
-	        else if(TEMP_REPORT == RecvQue)             // Si es porque se debe reportar el valor de la temperatura, se llama a la funcion que la mide y se envia
-	        {
-	            struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                                         pub_topic_json,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+                UART_PRINT("\n\r CC3200 Publishes the following message \n\r");
+                UART_PRINT("Topic: %s\n\r",pub_topic_sw2);
+                UART_PRINT("Data: %s\n\r",data_sw2);
+            }
+            else if(PUSH_BUTTON_SW3_PRESSED == RecvQue)     // Si es porque se ha pulsado el boton SW3, se envia el mensaje corresponiente
+            {
 
-	            double tempIR,tempAmb;
-	            TMP006DrvGetTemp2(&tempIR,&tempAmb);
-	            json_printf(&out1,"{ tempIR : %f,  tempAmb : %f}", (float)tempIR, (float)tempAmb);
-	            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-	                                     pub_topic_temp,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-	            UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-	            UART_PRINT("Topic: %s\n\r",pub_topic_temp);
-	            UART_PRINT("Data: %s\n\r",json_buffer);
-	        }
-	        else if(ACC_REPORT == RecvQue)              // Si es porque se debe reportar el valor de la aceleracion, se llama a la funcion que la mide y se envia
-	        {
-	            struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-	            int8_t x_acc,y_acc,z_acc;
-	            BMA222ReadNew(&x_acc, &y_acc, &z_acc);
-	            json_printf(&out1,"{ x_acc : %d,  y_acc : %d, z_acc : %d}", (int)x_acc, (int)y_acc, (int)z_acc);
-	            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-	                                     pub_topic_acc,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-	            UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-	            UART_PRINT("Topic: %s\n\r",pub_topic_acc);
-	            UART_PRINT("Data: %s\n\r",json_buffer);
-	        }
-	        else if(BROKER_DISCONNECTION == RecvQue)    // Si es porque se ha producido una desconexion se termina
-	        {
-	            iConnBroker--;
-	            if(iConnBroker < 1)
-	            {
-	                //
-	                // device not connected to any broker
-	                //
-	                goto end;
-	            }
-	        }
-	    }
-	end:
-	    //
-	    // Deinitializating the client library
-	    //
-	    sl_ExtLib_MqttClientExit();
-	    UART_PRINT("\n\r Exiting the Application\n\r");
+                //
+                // send publish message
+                //
+                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                                         pub_topic_sw3,data_sw3,strlen((char*)data_sw3),QOS2,RETAIN);
 
-	    //LOOP_FOREVER();
-	    //Kill the task
-	    OsiTaskHandle handle=NULL;
-	    osi_TaskDelete(&handle);
+                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+
+                //Reinicio out1, de lo contrario se van acumulando los printfs
+
+                json_printf(&out1,"{ boton : %B}",true);
+
+                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                                         pub_topic_json,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+
+
+                UART_PRINT("\n\r CC3200 Publishes the following message \n\r");
+                UART_PRINT("Topic: %s\n\r",pub_topic_sw3);
+                UART_PRINT("Data: %s\n\r",data_sw3);
+            }
+            else if(PING_REPORT == RecvQue)             // Si es porque se debe responder al comando recibido ping, se envia el mensaje  {"ping" : true }
+            {
+                bool ping = true;
+                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+                json_printf(&out1,"{ ping : %B}", ping);
+                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                                         pub_topic_ping,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+                UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
+                UART_PRINT("Topic: %s\n\r",pub_topic_ping);
+                UART_PRINT("Data: %s\n\r",json_buffer);
+            }
+            else if(BUTTON_STATE_REPORT == RecvQue)     // Si es porque se debe reportar el valor de los botones, se comprueba sus estado y se envian
+            {
+                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+
+                // Button 1
+                bool button1 = GPIOPinRead(GPIOA1_BASE,GPIO_PIN_5)>>5;
+                bool button2 = GPIOPinRead(GPIOA2_BASE,GPIO_PIN_6)>>6;
+                json_printf(&out1,"{ button1 : %B,  button2 : %B}", button1, button2);
+                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                                         pub_topic_checkButtons,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+                UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
+                UART_PRINT("Topic: %s\n\r",pub_topic_checkButtons);
+                UART_PRINT("Data: %s\n\r",json_buffer);
+            }
+            else if(TEMP_REPORT == RecvQue)             // Si es porque se debe reportar el valor de la temperatura, se llama a la funcion que la mide y se envia
+            {
+                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+
+                double tempIR,tempAmb;
+                TMP006DrvGetTemp2(&tempIR,&tempAmb);
+                json_printf(&out1,"{ tempIR : %f,  tempAmb : %f}", (float)tempIR, (float)tempAmb);
+                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                                         pub_topic_temp,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+                UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
+                UART_PRINT("Topic: %s\n\r",pub_topic_temp);
+                UART_PRINT("Data: %s\n\r",json_buffer);
+            }
+            else if(ACC_REPORT == RecvQue)              // Si es porque se debe reportar el valor de la aceleracion, se llama a la funcion que la mide y se envia
+            {
+                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+                int8_t x_acc,y_acc,z_acc;
+                BMA222ReadNew(&x_acc, &y_acc, &z_acc);
+                json_printf(&out1,"{ x_acc : %d,  y_acc : %d, z_acc : %d}", (int)x_acc, (int)y_acc, (int)z_acc);
+                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                                         pub_topic_acc,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+                UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
+                UART_PRINT("Topic: %s\n\r",pub_topic_acc);
+                UART_PRINT("Data: %s\n\r",json_buffer);
+            }
+            else if(BROKER_DISCONNECTION == RecvQue)    // Si es porque se ha producido una desconexion se termina
+            {
+                iConnBroker--;
+                if(iConnBroker < 1)
+                {
+                    //
+                    // device not connected to any broker
+                    //
+                    goto end;
+                }
+            }
+        }
+    end:
+        //
+        // Deinitializating the client library
+        //
+        sl_ExtLib_MqttClientExit();
+        UART_PRINT("\n\r Exiting the Application\n\r");
+
+        //LOOP_FOREVER();
+        //Kill the task
+        OsiTaskHandle handle=NULL;
+        osi_TaskDelete(&handle);
 
 
 }
@@ -1144,7 +1152,7 @@ void ConnectWiFI(void *pvParameters)
 #else
     lRetVal = Network_IF_InitDriver(ROLE_AP);
     if (lRetVal<0)
-    	LOOP_FOREVER();
+        LOOP_FOREVER();
 
     // switch on Green LED to indicate Simplelink is properly up
     GPIO_IF_LedOn(MCU_ON_IND);
@@ -1154,18 +1162,18 @@ void ConnectWiFI(void *pvParameters)
 
     lRetVal=sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_SSID, strlen(SSID_NAME), SSID_NAME); //Configura el SSID en modo AP...
     if (lRetVal<0)
-        	LOOP_FOREVER();
+            LOOP_FOREVER();
 
     uint8_t secType=SECURITY_TYPE;
     lRetVal = sl_WlanSet(SL_WLAN_CFG_AP_ID,
-    		WLAN_AP_OPT_SECURITY_TYPE, 1,
-			(unsigned char *)&secType);
+            WLAN_AP_OPT_SECURITY_TYPE, 1,
+            (unsigned char *)&secType);
     if (lRetVal<0) ERR_PRINT( lRetVal);
 
     lRetVal = sl_WlanSet(SL_WLAN_CFG_AP_ID,
-    		WLAN_AP_OPT_PASSWORD,
-			strlen((const char *)SECURITY_KEY),
-			(unsigned char *)SECURITY_KEY);
+            WLAN_AP_OPT_PASSWORD,
+            strlen((const char *)SECURITY_KEY),
+            (unsigned char *)SECURITY_KEY);
     if (lRetVal<0) ERR_PRINT( lRetVal);
 
     //Restart the network after changing access point name....
@@ -1199,7 +1207,7 @@ void ConnectWiFI(void *pvParameters)
     //
     if(I2C_IF_Open(I2C_MASTER_MODE_FST) < 0)
     {
-   	 while (1);
+     while (1);
     }
 
     osi_Sleep(10); //Espera un poco
@@ -1209,14 +1217,14 @@ void ConnectWiFI(void *pvParameters)
     //Init Temperature Sensor
     if(TMP006DrvOpen() < 0)
     {
-    	UARTprintf("TMP006 open error\n");
+        UARTprintf("TMP006 open error\n");
     }
 
     //Esto tiene que ser realizado en una tarea. De momento lo pongo aqui
     //Init Accelerometer Sensor
     if(BMA222Open() < 0)
     {
-    	UARTprintf("BMA222 open error\n");
+        UARTprintf("BMA222 open error\n");
     }
 
 
@@ -1237,7 +1245,7 @@ void ConnectWiFI(void *pvParameters)
     //
     // Display Application Banner
     //
-    DisplayBanner("TFM - Sergio Gasquez")
+    DisplayBanner("TFM - Sergio Gasquez");
    
     //
     // Init Push Button, enable ISRs
@@ -1249,11 +1257,11 @@ void ConnectWiFI(void *pvParameters)
                         (const signed char *)"CmdLine",
                         OSI_STACK_SIZE, NULL, 2, NULL );
 
-	if(lRetVal < 0)
-	{
-    	ERR_PRINT(lRetVal);
-    	LOOP_FOREVER();
-	}
+    if(lRetVal < 0)
+    {
+        ERR_PRINT(lRetVal);
+        LOOP_FOREVER();
+    }
 
 
 #ifdef STATION_MODE
@@ -1443,18 +1451,27 @@ void moistureTask (void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-//        uint32_t sample = 0;
-//        sample = analogReadMoisture();
-//        double voltage;
-//        voltage = sample * (1.467/4096);            // Calcular si es 4096 o 4095
-//        UART_PRINT("\n Code: %lu   Voltage: %f", sample,voltage);
-        readWaterLevel();
-        osi_Sleep(3000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
+        uint32_t sample = 0;
+        sample = analogReadMoisture();
+        double voltage;
+        voltage = sample * (1.467/4096);                                             // Calcular si es 4096 o 4095
+        UART_PRINT("\n Code: %lu   Voltage: %f", sample,voltage);
+        osi_Sleep(10000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
     }
 }
 
-
-
+void waterLevelTask (void *pvParameters)
+{
+    for( ;; )                                                                       // Debemos tener un bucle infinito
+    {
+          readWaterLevel();
+          osi_Sleep(3000);
+//        MAP_GPIOPinWrite(GPIOA0_BASE, PIN_62,PIN_62);
+//        osi_Sleep(3000);
+//        MAP_GPIOPinWrite(GPIOA0_BASE, PIN_62, ~PIN_62);
+//        osi_Sleep(3000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
+    }
+}
 
 
 
@@ -1489,11 +1506,20 @@ void main()
     //
     PinMuxConfig();
 
-    setupAdc();
     //
     // Configuring UART
     //
     InitTerm();
+
+    //
+    // Configure the ADC for the Moisture Sensor
+    //
+    setupAdc();
+
+    //
+    // Configure the timers for the Water Level Sensor
+    //
+    setupWaterLevel();
 
     //
     // Start the SimpleLink Host
@@ -1533,9 +1559,29 @@ void main()
        LOOP_FOREVER();
     }
 
+    //
+    // Comenzar la tarea que gestiona cuando se debe reportar el valor de los aceleracion
+    //
+    lRetVal = osi_TaskCreate(waterLevelTask,
+                                (const signed char *)"Water Level Task",
+                                OSI_STACK_SIZE, NULL, 2, NULL );
+
+    if(lRetVal < 0)
+    {
+       ERR_PRINT(lRetVal);
+       LOOP_FOREVER();
+    }
+
+
 
     moistureMeasures = xEventGroupCreate();              // Crear el grupo de eventos para la aceleracion
     if( moistureMeasures == NULL )
+    {
+       while(1);
+    }
+
+    waterLevelMeasures  = xEventGroupCreate();              // Crear el grupo de eventos para la aceleracion
+    if( waterLevelMeasures  == NULL )
     {
        while(1);
     }

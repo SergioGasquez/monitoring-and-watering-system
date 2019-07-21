@@ -11,10 +11,21 @@
 #include "timer.h"
 #include "hw_timer.h"
 #include "rom_map.h"
+#include "portmacro.h"
+#include "projdefs.h"
+#include "FreeRTOS.h"
+#include "event_groups.h"               // Libreria de grupos de eventos
+#include "task.h"
+#include "osi.h"
+
+static  EventGroupHandle_t waterLevelMeasures;
+#define WAITING_ECHO          0x0001
+
+extern int echowait ;
 extern volatile int pulse;
-extern int echowait;
-#define ECHO_PIN PIN_08
-#define TRIGGER_PIN PIN_64
+
+//#define ECHO_PIN PIN_08
+//#define TRIGGER_PIN PIN_64
 
 #ifdef __cplusplus
 extern "C"

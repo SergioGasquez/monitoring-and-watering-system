@@ -42,6 +42,9 @@ PinMuxConfig(void)
     MAP_PRCMPeripheralClkEnable(PRCM_GPIOA2, PRCM_RUN_MODE_CLK);
     MAP_PRCMPeripheralClkEnable(PRCM_UARTA0, PRCM_RUN_MODE_CLK);
 
+    MAP_PRCMPeripheralClkEnable(PRCM_TIMERA2, PRCM_RUN_MODE_CLK);       // Timer para el sensor de nivel de agua
+
+
     //
     // Configure PIN_64 for GPIOOutput (Trigger)
     //
@@ -67,10 +70,12 @@ PinMuxConfig(void)
     MAP_GPIODirModeSet(GPIOA1_BASE, 0x8, GPIO_DIR_MODE_OUT);
 
     //
-    // Configure PIN_04 for GPIOInput
+    // Configure PIN_04 for Timer
     //
-    MAP_PinTypeGPIO(PIN_04, PIN_MODE_0, false);
-    MAP_GPIODirModeSet(GPIOA1_BASE, 0x20, GPIO_DIR_MODE_IN);
+    //MAP_PinTypeTimer(PIN_04, PIN_MODE_12);
+
+//    MAP_PinTypeGPIO(PIN_04, PIN_MODE_0, false);
+//    MAP_GPIODirModeSet(GPIOA1_BASE, 0x20, GPIO_DIR_MODE_IN);
 
     //
     // Configure PIN_15 for GPIOInput
@@ -93,5 +98,6 @@ PinMuxConfig(void)
     //
     MAP_PinTypeGPIO(PIN_59, PIN_MODE_0, false);
     MAP_GPIODirModeSet(GPIOA0_BASE, 0x10, GPIO_DIR_MODE_IN);
+
 
 }

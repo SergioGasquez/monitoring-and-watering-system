@@ -12,14 +12,20 @@ void setupAdc()
 
 uint32_t analogReadMoisture()
 {
-
-    uint32_t ulSample;
-    //uint64_t measure;
-    if( ADCFIFOLvlGet(ADC_BASE, ADC_CH_2) )
+    uint64_t measure = 0;
+    uint32_t ulSample = 0;
+    uint8_t i;
+    for (i = 0; i <100 ;i++)
     {
-        ulSample = ADCFIFORead(ADC_BASE, ADC_CH_2);
+        if( ADCFIFOLvlGet(ADC_BASE, ADC_CH_2) )
+        {
+            ulSample = ADCFIFORead(ADC_BASE, ADC_CH_2);
+        }
+        ulSample = ulSample  & 0x3FFF; //  Los bits en los que devuelve la respuesta son del 13 al 2. Por eso esta mascara, para qutiarse los de arriba
+        ulSample = ulSample >>2;        // Quitamos los 2 primeros bits
+        measure += ulSample;
     }
-    ulSample = ulSample  & 0x3FFF;
-    ulSample = ulSample >>2;
+    measure = measure/10;       // Duda
+    ulSample = measure;
     return ulSample;
 }
