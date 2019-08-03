@@ -143,8 +143,6 @@ to exclude the API function. */
 #define INCLUDE_eTaskGetState					1
 #define INCLUDE_xSemaphoreGetMutexHolder		0
 #define INCLUDE_xTaskGetCurrentTaskHandle		1
-#define INCLUDE_xTimerPendFunctionCall		1
-#define INCLUDE_xEventGroupSetBitFromISR        1           // [SGA]: Para el grupo de eventos
 */
 #define INCLUDE_vTaskPrioritySet                1
 #define INCLUDE_uxTaskPriorityGet               1

@@ -349,13 +349,17 @@ I2C_IF_ReadFrom(unsigned char ucDevAddr,
 	    	IntPendSet(INT_I2CA0);	//Produce un disparo software....
 	    }
 
-	    //CEspera a que se complete la operacion de escritura/lectura o se produza error
+	    //Espera a que se complete la operacion de escritura/lectura o se produza error
 	    while (!(notifVal&(I2C_NOTIFY_READ_COMPLETE|I2C_NOTIFY_ERR)))
 	    {
 	    	xTaskNotifyWait( 0, I2C_NOTIFY_WRITE_COMPLETE|I2C_NOTIFY_READ_COMPLETE|I2C_NOTIFY_ERR, &notifVal, portMAX_DELAY);
 	    }
 
-	    if (notifVal&I2C_NOTIFY_ERR) return FAILURE;
+	    if (notifVal&I2C_NOTIFY_ERR)
+	    {
+	        return FAILURE;
+	    }
+
 
     return SUCCESS;
 }
@@ -697,9 +701,9 @@ I2C_IF_Open(unsigned long ulMode)
     	while(1);
 
     //Registra, congigura y habilia la ISR
-    IntRegister(INT_I2CA0,I2C_IF_ISR);
-    IntPrioritySet(INT_I2CA0,configKERNEL_INTERRUPT_PRIORITY);
-    IntEnable(INT_I2CA0);	//Habilita la ISR
+     IntRegister(INT_I2CA0,I2C_IF_ISR);
+     IntPrioritySet(INT_I2CA0,configKERNEL_INTERRUPT_PRIORITY);
+     IntEnable(INT_I2CA0);	//Habilita la ISR
 
     //This disconfigures PIN1 and 2 for LEDs...
     // Configure PIN_01 for I2C0 I2C_SCL

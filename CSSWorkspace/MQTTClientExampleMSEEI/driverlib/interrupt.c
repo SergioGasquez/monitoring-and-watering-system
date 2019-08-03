@@ -646,7 +646,7 @@ IntPendSet(unsigned long ulInterrupt)
     }
     else if(ulInterrupt >= 16)
     {
-        //
+        //  ENTRA AQUI
         // Pend the general interrupt.
         //
         HWREG(g_pulPendRegs[(ulInterrupt - 16) / 32]) =

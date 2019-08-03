@@ -68,6 +68,7 @@
 #include "bma222drv.h"
 #include "moistureSensor.h"
 #include "waterLevelSensor.h"
+#include "temperatureSensor.h"
 
 //FreeRTOS
 #include"FreeRTOS.h"
@@ -118,7 +119,8 @@
 
 /*Topics a los que va a publicar*/
 #define PUB_TOPIC_MOISTURE_SENSOR  "/cc3200/MoistureSensor"
-
+#define PUB_TOPIC_MOISTURE_SENSOR  "/cc3200/WaterLevelSensor"
+#define PUB_TOPIC_MOISTURE_SENSOR  "/cc3200/TemperatureSensor"
 /*Numero de topics a los que se va a subscribir*/
 #define TOPIC_COUNT             1
 
@@ -161,7 +163,9 @@ typedef struct connection_config{
 
 typedef enum events
 {
-    MOISTURE_REPORT,                         // Manda los valores de aceleracion
+    MOISTURE_REPORT,
+    WATER_LEVEL_REPORT,
+    TEMPERATURE_REPORT,
     BROKER_DISCONNECTION
 }osi_messages;
 
@@ -181,6 +185,9 @@ volatile int pulse= 0;
 
 static EventGroupHandle_t moistureMeasures;                  // Grupo de evento que controlar� cuando se arranca la medicion de aceleracion
 #define MOISTURE_READY          0x0001
+
+static EventGroupHandle_t temperatureMeasures;                  // Grupo de evento que controlar� cuando se arranca la medicion de aceleracion
+#define TEMPERATURE_READY          0x0001
 
 
 // TBDeleted!
@@ -221,6 +228,7 @@ static void DisplayBanner(char * AppName);
 void ConnectWiFI(void *pvParameters);
 void moistureTask(void *pvParameters);                   // Tarea que envia el estado de la acceleracion
 void waterLevelTask(void *pvParameters);
+void temperatureTask(void *pvParameters);
 
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- Start
@@ -1205,12 +1213,11 @@ void ConnectWiFI(void *pvParameters)
     //
     // Inicializa la biblioteca que gestiona el bus I2C. (movido desde main(...))
     //
-    if(I2C_IF_Open(I2C_MASTER_MODE_FST) < 0)
-    {
-     while (1);
-    }
-
-    osi_Sleep(10); //Espera un poco
+//    if(I2C_IF_Open(I2C_MASTER_MODE_FST) < 0)
+//    {
+//     while (1);
+//    }
+//    osi_Sleep(10); //Espera un poco
 
 
     //Esto tiene que ser realizado en una tarea. De momento lo pongo aqui
@@ -1222,10 +1229,10 @@ void ConnectWiFI(void *pvParameters)
 
     //Esto tiene que ser realizado en una tarea. De momento lo pongo aqui
     //Init Accelerometer Sensor
-    if(BMA222Open() < 0)
-    {
-        UARTprintf("BMA222 open error\n");
-    }
+//    if(BMA222Open() < 0)
+//    {
+//        UARTprintf("BMA222 open error\n");
+//    }
 
 
     osi_Sleep(10); //Espera un poco
@@ -1233,10 +1240,11 @@ void ConnectWiFI(void *pvParameters)
     //
     // Vuelve a poner los pines como salida GPIO
     // No deberia hacerlo mientras haya una transferencia I2C activa.
-    MAP_PinTypeGPIO(PIN_01, PIN_MODE_0, false);
-    MAP_GPIODirModeSet(GPIOA1_BASE, 0x4, GPIO_DIR_MODE_OUT);
-    MAP_PinTypeGPIO(PIN_02, PIN_MODE_0, false);
-    MAP_GPIODirModeSet(GPIOA1_BASE, 0x8, GPIO_DIR_MODE_OUT);
+
+//    MAP_PinTypeGPIO(PIN_01, PIN_MODE_0, false);
+//    MAP_GPIODirModeSet(GPIOA1_BASE, 0x4, GPIO_DIR_MODE_OUT);
+//    MAP_PinTypeGPIO(PIN_02, PIN_MODE_0, false);
+//    MAP_GPIODirModeSet(GPIOA1_BASE, 0x8, GPIO_DIR_MODE_OUT);
 
     //HAbilitamos los timers en modo PWM (pero NO habilitamos los pines como PWM)
     PWM_IF_Init(0);
@@ -1464,15 +1472,29 @@ void waterLevelTask (void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-          readWaterLevel();
-          osi_Sleep(3000);
+//          readWaterLevel();
+//          osi_Sleep(3000);
 //        MAP_GPIOPinWrite(GPIOA0_BASE, PIN_62,PIN_62);
 //        osi_Sleep(3000);
 //        MAP_GPIOPinWrite(GPIOA0_BASE, PIN_62, ~PIN_62);
-//        osi_Sleep(3000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
+        osi_Sleep(3000000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
     }
 }
 
+void temperatureTask (void *pvParameters)
+{
+    for( ;; )                                                                       // Debemos tener un bucle infinito
+    {
+       // PONER ALGUN STOPER PARA QUE NO EMPIEZE ANTES DE ARRANCAR TODO
+       osi_Sleep(5000);
+       float  temperature;
+       float  humidity;
+       getTemperature(&temperature, &humidity);
+       UART_PRINT("\n TEMPERATURE: %f", temperature);
+       UART_PRINT("\n HUMIDITY: %f", humidity);
+
+    }
+}
 
 
 
@@ -1520,6 +1542,11 @@ void main()
     // Configure the timers for the Water Level Sensor
     //
     setupWaterLevel();
+
+    //
+    // Configure the I2C for the Water Level Sensor
+    //
+    setupTemperatureSensor();
 
     //
     // Start the SimpleLink Host
@@ -1572,6 +1599,18 @@ void main()
        LOOP_FOREVER();
     }
 
+    //
+    // Comenzar la tarea que gestiona cuando se debe reportar el valor de los aceleracion
+    //
+    lRetVal = osi_TaskCreate(temperatureTask,
+                                (const signed char *)"Temperature Task",
+                                OSI_STACK_SIZE, NULL, 2, NULL );
+
+    if(lRetVal < 0)
+    {
+       ERR_PRINT(lRetVal);
+       LOOP_FOREVER();
+    }
 
 
     moistureMeasures = xEventGroupCreate();              // Crear el grupo de eventos para la aceleracion
@@ -1582,6 +1621,12 @@ void main()
 
     waterLevelMeasures  = xEventGroupCreate();              // Crear el grupo de eventos para la aceleracion
     if( waterLevelMeasures  == NULL )
+    {
+       while(1);
+    }
+
+    temperatureMeasures  = xEventGroupCreate();              // Crear el grupo de eventos para la aceleracion
+    if( temperatureMeasures  == NULL )
     {
        while(1);
     }

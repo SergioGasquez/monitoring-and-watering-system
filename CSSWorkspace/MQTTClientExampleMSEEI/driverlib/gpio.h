@@ -118,7 +118,7 @@ extern void GPIODMATriggerDisable(unsigned long ulPort);
 extern unsigned long GPIOIntTypeGet(unsigned long ulPort, unsigned char ucPin);
 extern void GPIOIntEnable(unsigned long ulPort, unsigned long ulIntFlags);
 extern void GPIOIntDisable(unsigned long ulPort, unsigned long ulIntFlags);
-extern long GPIOIntStatus(unsigned long ulPort, tBoolean bMasked);
+extern long GPIOIntStatus(unsigned long ulPort, unsigned char  bMasked);
 extern void GPIOIntClear(unsigned long ulPort, unsigned long ulIntFlags);
 extern void GPIOIntRegister(unsigned long ulPort,
                                 void (*pfnIntHandler)(void));

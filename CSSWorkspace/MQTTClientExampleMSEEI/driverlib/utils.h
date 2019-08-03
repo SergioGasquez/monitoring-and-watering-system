@@ -56,7 +56,7 @@ extern "C"
 // API Function prototypes
 //
 //*****************************************************************************
-extern void UtilsDelay(unsigned long ulCount);
+//extern void UtilsDelay(unsigned long ulCount);
 
 
 //*****************************************************************************
