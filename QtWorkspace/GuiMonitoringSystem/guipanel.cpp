@@ -12,6 +12,9 @@
 
 #include<stdint.h>      // Cabecera para usar tipos de enteros con tamaño
 #include<stdbool.h>     // Cabecera para usar booleanos
+#include <iostream>
+#include <fstream>
+#include <string>
 
 
 constexpr const char * TOPIC_PC                     = "/PC";       // Topic en el que se publican los mensajes de PC a CC3200
@@ -38,7 +41,6 @@ GUIPanel::GUIPanel(QWidget *parent) :                // Constructor de la clase
    transactionCount(0),
    pinged_(false),                                   // Inicializamos las variables que controlan que topics esperamos
    temperatureEnabled_(false),
-   humidityEnabled_(false),
    moistureEnable_(false),
    waterLevelEnable_(false)
 {
@@ -60,26 +62,55 @@ GUIPanel::GUIPanel(QWidget *parent) :                // Constructor de la clase
       ui->pingButton->setEnabled(false);
 
 
-    //Configuramos la accGraph
+    //Configuramos la moistureGraph
     ui->moistureGraph->setAxisTitle(QwtPlot::xBottom,"Sample Number");   // Titulo de los ejes
     ui->moistureGraph->setAxisTitle(QwtPlot::yLeft, "%");
     ui->moistureGraph->setAxisScale(QwtPlot::yLeft, 0.0, 100.0);          // Con escala definida
     ui->moistureGraph->setAutoReplot(false);
 
-    //Creamos una curva y la añadimos a la accGraph
+    //Creamos una curva y la añadimos a la moistureGraph
     m_Moisture = new QwtPlotCurve();
     m_Moisture->setPen(QPen(Qt::red));
     mMoisture_Grid = new QwtPlotGrid();
     mMoisture_Grid->attach(ui->moistureGraph);
     m_Moisture->attach(ui->moistureGraph);
 
-    //Inicializadmos los datos que se muestran en la accGraph
-    for (int i=0; i<NMAX; i++) {
+    //Inicializadmos los datos que se muestran en la moistureGraph
+    for (int i=0; i<NMAX; i++)
+    {
         yValMoisture[i]=0;
         xValMoisture[i]=i;
     }
     m_Moisture->setRawSamples(xValMoisture,yValMoisture,NMAX);
     ui->moistureGraph->replot();
+
+//    //Configuramos la ambientGraph
+    ui->ambientGraph->setAxisTitle(QwtPlot::xBottom,"Sample Number");   // Titulo de los ejes
+    ui->ambientGraph->setAxisTitle(QwtPlot::yLeft, "ºC/%");
+    ui->ambientGraph->setAxisScale(QwtPlot::yLeft, 0.0, 100.0);          // Con escala definida
+    ui->ambientGraph->setAutoReplot(false);
+
+//    ///Creamos una curva y la añadimos a la accGraph
+    m_curve_temp = new QwtPlotCurve();
+    m_curve_temp->setPen(QPen(Qt::red));
+    m_Ambient_Grid = new QwtPlotGrid();
+    m_Ambient_Grid->attach(ui->ambientGraph);
+    m_curve_temp->attach(ui->ambientGraph);
+
+//    //Creamos una curva y la añadimos a la accGraph
+    m_curve_hum = new QwtPlotCurve();
+    m_curve_hum->setPen(QPen(Qt::blue));
+    m_curve_hum->attach(ui->ambientGraph);
+
+//    //Inicializadmos los datos que se muestran en la accGraph
+    for (int i=0; i<NMAX; i++) {
+        yValTemp[i]=0;
+        yValHum[i]=0;
+        xVal[i]=i;
+    }
+    m_curve_temp->setRawSamples(xVal,yValTemp,NMAX);
+    m_curve_hum->setRawSamples(xVal,yValHum,NMAX);
+    ui->ambientGraph->replot();
 }
 
 GUIPanel::~GUIPanel()   // Destructor de la clase
@@ -191,21 +222,40 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
             if(temperatureEnabled_)
             {
                 QJsonValue temperature=objeto_json["temperature"];
-                ui->temperature->setValue(temperature.toDouble());
-            }
-            if(humidityEnabled_)
-            {
                 QJsonValue humidity=objeto_json["humidity"];
-                ui->humidity->setValue(humidity.toDouble());
+                if (temperature != QJsonValue::Null && humidity != QJsonValue::Null)
+                {
+                    ui->temperature->setValue(temperature.toDouble());
+                    ui->humidity->setValue(humidity.toDouble());
+                    memmove(yValTemp,yValTemp+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
+                    yValTemp[NMAX-1]=temperature.toDouble();    //Añadimos el último punto
+                    m_curve_temp->setRawSamples(xVal,yValTemp,NMAX);          //Refrescamos..
+                    memmove(yValHum,yValHum+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
+                    yValHum[NMAX-1]=humidity.toDouble();    //Añadimos el último punto
+                    m_curve_hum->setRawSamples(xVal,yValHum,NMAX);
+                    ui->ambientGraph->replot();
+
+                }
             }
+
             if(moistureEnable_)
             {
                 QJsonValue moisture=objeto_json["moisture"];
-                ui->moisture->setValue(moisture.toDouble());
-                memmove(yValMoisture,yValMoisture+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
-                yValMoisture[NMAX-1]=moisture.toDouble();    //Añadimos el último punto
-                m_Moisture->setRawSamples(xValMoisture,yValMoisture,NMAX);          //Refrescamos..
-                ui->moistureGraph->replot();
+                if (moisture != QJsonValue::Null)
+                {
+                    ui->moisture->setValue(moisture.toDouble());
+                    memmove(yValMoisture,yValMoisture+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
+                    yValMoisture[NMAX-1]=moisture.toDouble();    //Añadimos el último punto
+                    m_Moisture->setRawSamples(xValMoisture,yValMoisture,NMAX);          //Refrescamos..
+                    ui->moistureGraph->replot();
+
+                    std::ofstream os("Moisture.txt", std::ios_base::app);
+                    if(os.is_open()){
+                     os << std::endl << std::to_string(moisture.toDouble())  ;
+                     os.flush();
+                    }
+                }
+
             }
 
 
@@ -393,14 +443,7 @@ void GUIPanel::on_tempEnable_toggled(bool checked)
     QJsonDocument mensaje(objeto_json);
     SendMessage(mensaje);
 }
-void GUIPanel::on_humEnable_toggled(bool checked)
-{
-    humidityEnabled_ = checked;                           // Activamos o desactivamos la variable que observa si esperamos respuesta de este mensaje
-    QJsonObject objeto_json;
-    objeto_json["humidityEnable"]=checked;   // Creamos el mensaje y lo enviamos
-    QJsonDocument mensaje(objeto_json);
-    SendMessage(mensaje);
-}
+
 void GUIPanel::on_moistEnable_toggled(bool checked)
 {
     moistureEnable_ = checked;                           // Activamos o desactivamos la variable que observa si esperamos respuesta de este mensaje

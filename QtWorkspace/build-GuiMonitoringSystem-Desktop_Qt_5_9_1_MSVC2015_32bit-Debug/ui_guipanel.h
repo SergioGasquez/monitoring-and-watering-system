@@ -19,11 +19,14 @@
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QPushButton>
+#include <QtWidgets/QSlider>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QWidget>
 #include "analogwidgets/thermometer.h"
 #include "qwt_counter.h"
 #include "qwt_plot.h"
+#include "qwt_slider.h"
+#include "qwt_text_label.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -46,7 +49,6 @@ public:
     QLabel *labelMinutesTemp;
     QLabel *labelTemperature;
     QLabel *labelHumidity;
-    QCheckBox *humEnable;
     ThermoMeter *humidity;
     QGroupBox *groupMoisture;
     ThermoMeter *moisture;
@@ -61,8 +63,18 @@ public:
     QCheckBox *waterLevelEnable;
     QLabel *labelMinutesWaterLEvel;
     QWidget *ambienTab;
+    QwtPlot *ambientGraph;
     QWidget *MoistureTab;
     QwtPlot *moistureGraph;
+    QWidget *tab;
+    QPushButton *pushButton;
+    QSlider *horizontalSlider;
+    QSlider *verticalSlider;
+    QSlider *verticalSlider_2;
+    QPushButton *pushButton_2;
+    QwtTextLabel *riegoTiempoLabel;
+    QwtTextLabel *riegoParametrosLabel;
+    QwtSlider *Slider;
 
     void setupUi(QWidget *GUIPanel)
     {
@@ -137,7 +149,7 @@ public:
         labelFreqTemp->setFont(font5);
         tempEnable = new QCheckBox(groupAmbient);
         tempEnable->setObjectName(QStringLiteral("tempEnable"));
-        tempEnable->setGeometry(QRect(10, 60, 131, 41));
+        tempEnable->setGeometry(QRect(10, 30, 131, 41));
         QFont font6;
         font6.setPointSize(14);
         font6.setItalic(false);
@@ -150,16 +162,12 @@ public:
         labelMinutesTemp->setFont(font7);
         labelTemperature = new QLabel(groupAmbient);
         labelTemperature->setObjectName(QStringLiteral("labelTemperature"));
-        labelTemperature->setGeometry(QRect(40, 30, 151, 41));
+        labelTemperature->setGeometry(QRect(50, 60, 151, 41));
         labelTemperature->setFont(font1);
         labelHumidity = new QLabel(groupAmbient);
         labelHumidity->setObjectName(QStringLiteral("labelHumidity"));
-        labelHumidity->setGeometry(QRect(250, 30, 151, 41));
+        labelHumidity->setGeometry(QRect(260, 60, 151, 41));
         labelHumidity->setFont(font1);
-        humEnable = new QCheckBox(groupAmbient);
-        humEnable->setObjectName(QStringLiteral("humEnable"));
-        humEnable->setGeometry(QRect(230, 60, 131, 41));
-        humEnable->setFont(font6);
         humidity = new ThermoMeter(groupAmbient);
         humidity->setObjectName(QStringLiteral("humidity"));
         humidity->setGeometry(QRect(220, 90, 201, 201));
@@ -235,17 +243,57 @@ public:
         ambienTab = new QWidget();
         ambienTab->setObjectName(QStringLiteral("ambienTab"));
         ambienTab->setEnabled(true);
+        ambientGraph = new QwtPlot(ambienTab);
+        ambientGraph->setObjectName(QStringLiteral("ambientGraph"));
+        ambientGraph->setGeometry(QRect(40, 30, 871, 431));
         tabWidget->addTab(ambienTab, QString());
         MoistureTab = new QWidget();
         MoistureTab->setObjectName(QStringLiteral("MoistureTab"));
         moistureGraph = new QwtPlot(MoistureTab);
         moistureGraph->setObjectName(QStringLiteral("moistureGraph"));
-        moistureGraph->setGeometry(QRect(70, 60, 431, 281));
+        moistureGraph->setGeometry(QRect(40, 30, 871, 431));
         tabWidget->addTab(MoistureTab, QString());
+        tab = new QWidget();
+        tab->setObjectName(QStringLiteral("tab"));
+        pushButton = new QPushButton(tab);
+        pushButton->setObjectName(QStringLiteral("pushButton"));
+        pushButton->setGeometry(QRect(610, 110, 121, 51));
+        horizontalSlider = new QSlider(tab);
+        horizontalSlider->setObjectName(QStringLiteral("horizontalSlider"));
+        horizontalSlider->setGeometry(QRect(170, 110, 341, 51));
+        horizontalSlider->setMaximum(60);
+        horizontalSlider->setSingleStep(5);
+        horizontalSlider->setOrientation(Qt::Horizontal);
+        verticalSlider = new QSlider(tab);
+        verticalSlider->setObjectName(QStringLiteral("verticalSlider"));
+        verticalSlider->setGeometry(QRect(120, 250, 22, 160));
+        verticalSlider->setOrientation(Qt::Vertical);
+        verticalSlider_2 = new QSlider(tab);
+        verticalSlider_2->setObjectName(QStringLiteral("verticalSlider_2"));
+        verticalSlider_2->setGeometry(QRect(290, 250, 22, 160));
+        verticalSlider_2->setOrientation(Qt::Vertical);
+        pushButton_2 = new QPushButton(tab);
+        pushButton_2->setObjectName(QStringLiteral("pushButton_2"));
+        pushButton_2->setGeometry(QRect(470, 290, 171, 71));
+        riegoTiempoLabel = new QwtTextLabel(tab);
+        riegoTiempoLabel->setObjectName(QStringLiteral("riegoTiempoLabel"));
+        riegoTiempoLabel->setGeometry(QRect(20, 60, 201, 41));
+        riegoTiempoLabel->setFont(font1);
+        riegoTiempoLabel->setIndent(6);
+        riegoParametrosLabel = new QwtTextLabel(tab);
+        riegoParametrosLabel->setObjectName(QStringLiteral("riegoParametrosLabel"));
+        riegoParametrosLabel->setGeometry(QRect(30, 190, 221, 41));
+        riegoParametrosLabel->setFont(font1);
+        riegoParametrosLabel->setIndent(6);
+        Slider = new QwtSlider(tab);
+        Slider->setObjectName(QStringLiteral("Slider"));
+        Slider->setGeometry(QRect(419, 410, 431, 61));
+        Slider->setOrientation(Qt::Horizontal);
+        tabWidget->addTab(tab, QString());
 
         retranslateUi(GUIPanel);
 
-        tabWidget->setCurrentIndex(0);
+        tabWidget->setCurrentIndex(3);
 
 
         QMetaObject::connectSlotsByName(GUIPanel);
@@ -273,7 +321,6 @@ public:
         labelMinutesTemp->setText(QApplication::translate("GUIPanel", "Minutes", Q_NULLPTR));
         labelTemperature->setText(QApplication::translate("GUIPanel", "Temperature", Q_NULLPTR));
         labelHumidity->setText(QApplication::translate("GUIPanel", "Humidity Ratio", Q_NULLPTR));
-        humEnable->setText(QApplication::translate("GUIPanel", "Enable", Q_NULLPTR));
 #ifndef QT_NO_TOOLTIP
         humidity->setToolTip(QApplication::translate("GUIPanel", "Shows the temperature", Q_NULLPTR));
 #endif // QT_NO_TOOLTIP
@@ -306,6 +353,11 @@ public:
         tabWidget->setTabText(tabWidget->indexOf(generalTab), QApplication::translate("GUIPanel", "Tab 1", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(ambienTab), QApplication::translate("GUIPanel", "Page", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(MoistureTab), QApplication::translate("GUIPanel", "Tab 2", Q_NULLPTR));
+        pushButton->setText(QApplication::translate("GUIPanel", "Regar ", Q_NULLPTR));
+        pushButton_2->setText(QApplication::translate("GUIPanel", "Fijar parametros de riego", Q_NULLPTR));
+        riegoTiempoLabel->setPlainText(QApplication::translate("GUIPanel", "Riego por tiempo:", Q_NULLPTR));
+        riegoParametrosLabel->setPlainText(QApplication::translate("GUIPanel", "Riego por parametros:", Q_NULLPTR));
+        tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("GUIPanel", "Page", Q_NULLPTR));
     } // retranslateUi
 
 };

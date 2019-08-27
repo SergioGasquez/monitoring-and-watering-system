@@ -8,7 +8,7 @@
 #include "stdbool.h"
 
 // Debug
-#define DEBUG_TEMPERATURESENSOR
+//#define DEBUG_TEMPERATURESENSOR
 // Pins
 #define HARD_RESET_PIN
 // Address

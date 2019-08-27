@@ -36,7 +36,6 @@ private slots:
     void on_stateButton_clicked();           // Funcion que se ejecuta al pulsar el boton "State"
     void on_pingButton_clicked();           // Funcion que se ejecuta al pulsar el boton "Ping"
     void on_tempEnable_toggled(bool checked);
-    void on_humEnable_toggled(bool checked);
     void on_moistEnable_toggled(bool checked);
 
 private:
@@ -55,7 +54,6 @@ private:
     // Variables que controlan las respuestas que esperamos
     bool pinged_;
     bool temperatureEnabled_;
-    bool humidityEnabled_;
     bool moistureEnable_;
     bool waterLevelEnable_;
 
@@ -67,12 +65,12 @@ private:
     QwtPlotCurve *m_Moisture;
 
     // Grafica Ambient
-//    double xVal[NMAX];          // Sample number
-//    double yVal1[NMAX];         // Temperature
-//    double yVal2[NMAX];         // Humidity ratio
-//    QwtPlotGrid  *m_Grid;
-//    QwtPlotCurve *m_curve_1;
-//    QwtPlotCurve *m_curve_2;
+    double xVal[NMAX];          // Sample number
+    double yValTemp[NMAX];         // Temperature
+    double yValHum[NMAX];         // Humidity ratio
+    QwtPlotGrid  *m_Ambient_Grid;
+    QwtPlotCurve *m_curve_temp;
+    QwtPlotCurve *m_curve_hum;
 
 
 

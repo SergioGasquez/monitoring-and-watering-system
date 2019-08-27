@@ -46,6 +46,7 @@
 #include "pin.h"
 #include "timer.h"
 #include "adc.h"
+//#include "queue.h"
 
 // common interface includes
 #include "network_if.h"
@@ -96,7 +97,7 @@
 #define WILL_RETAIN             false
 
 /*Defining Broker IP address and port Number*/
-#define SERVER_ADDRESS          "192.168.1.94"      // IP del PC        //"192.168.1.2" <-- Si se usa modo AP
+#define SERVER_ADDRESS          "192.168.1.38"      // IP del PC        //"192.168.1.2" <-- Si se usa modo AP
 #define PORT_NUMBER             1883
 
 #define MAX_BROKER_CONN         1
@@ -119,8 +120,8 @@
 
 /*Topics a los que va a publicar*/
 #define PUB_TOPIC_MOISTURE_SENSOR  "/cc3200/MoistureSensor"
-#define PUB_TOPIC_MOISTURE_SENSOR  "/cc3200/WaterLevelSensor"
-#define PUB_TOPIC_MOISTURE_SENSOR  "/cc3200/TemperatureSensor"
+#define PUB_TOPIC_WATER_LEVEL_SENSOR  "/cc3200/WaterLevelSensor"
+#define PUB_TOPIC_TEMPERATURE_SENSOR  "/cc3200/TemperatureSensor"
 /*Numero de topics a los que se va a subscribir*/
 #define TOPIC_COUNT             1
 
@@ -179,35 +180,24 @@ void vUARTTask( void *pvParameters );
 int echowait = 0;
 volatile int pulse= 0;
 
-//static EventGroupHandle_t waterLevelMeasures;                  // Grupo de evento que controlar� cuando se arranca la medicion de aceleracion
-//#define WAITING_ECHO          0x0001
+//typedef struct {                                    // Struct para los umbrales que activan el riegoleds
+//    float temperature;
+//    float moisture;
+//}waterThreshold;
+
+typedef struct {                                    // Struct para almacenar los valores del sensor
+    float temperature;
+    float humidity;
+}sht31Data;
 
 
-static EventGroupHandle_t moistureMeasures;                  // Grupo de evento que controlar� cuando se arranca la medicion de aceleracion
-#define MOISTURE_READY          0x0001
+typedef struct {                                    // Struct para almacenar los envios
+    sht31Data sht31Data_;
+    float moisture_;
+    float waterLevel_;
+}sensorsData;
 
-static EventGroupHandle_t temperatureMeasures;                  // Grupo de evento que controlar� cuando se arranca la medicion de aceleracion
-#define TEMPERATURE_READY          0x0001
-
-
-// TBDeleted!
-typedef struct {                                    // Struct para almacenar los valores de pwm de los tres leds
-    unsigned long red ;
-    unsigned long green;
-    unsigned long orange;
-}pwmData;
-
-
-typedef struct {                                    // Struct para almacenar la configuracion global del proyecto
-    char mode;                                      // Modo de funcionamiento (Gpio, Pwm o I2C)
-    bool modeAsync;                                 // Modo de checkeo de botones asincrono activado?
-    pwmData pwmValues;                              // Valores de los pwm de los leds
-    bool accStarted;                                // Se ha iniciado la aceleracion?
-    float freqAcc;                                  // Frecuencia a la que se mide la aceleracion
-}configuration;
-
-configuration config;                               // Variable global del tipo configuration definido justo antes
-
+//static QueueHandle_t sensorsQueue;
 ////////////////////////////////////////////////////
 
 //*****************************************************************************
@@ -292,6 +282,10 @@ SlMqttClientLibCfg_t Mqtt_Client={
 
 /*Conversion a char* de los topics en los que publicaremos*/
 const char *pub_topic_moisture_sensor = PUB_TOPIC_MOISTURE_SENSOR;
+const char *pub_topic_temperature_sensor = PUB_TOPIC_TEMPERATURE_SENSOR;
+const char *pub_topic_water_level_sensor = PUB_TOPIC_WATER_LEVEL_SENSOR;
+
+
 
 
 void *app_hndl = (void*)usr_connect_config;
@@ -1406,18 +1400,29 @@ void ConnectWiFI(void *pvParameters)
         // Comrpobamosque tipo de mensaje es
         if(MOISTURE_REPORT== RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
         {
-            /*
-             struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-            int8_t x_acc,y_acc,z_acc;
-            BMA222ReadNew(&x_acc, &y_acc, &z_acc);
-            json_printf(&out1,"{ x_acc : %d,  y_acc : %d, z_acc : %d}", (int)x_acc, (int)y_acc, (int)z_acc);
+            sensorsData moistureSensor;
+            struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+            analogReadMoisture(&moistureSensor.moisture_);
+            json_printf(&out1,"{ moisture : %f}", (float)moistureSensor.moisture_);
             sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                             pub_topic_acc,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+                                     pub_topic_moisture_sensor,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
             UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-            UART_PRINT("Topic: %s\n\r",pub_topic_acc);
-            UART_PRINT("Data: %s\n\r",json_buffer);
-            */
+                        UART_PRINT("Topic: %s\n\r",pub_topic_moisture_sensor);
+                        UART_PRINT("Data: %s\n\r",json_buffer);
         }
+        else if(TEMPERATURE_REPORT== RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
+        {
+            sensorsData sht31;
+            struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+            getTemperature(&sht31.sht31Data_.temperature, &sht31.sht31Data_.humidity);
+            json_printf(&out1,"{ temperature : %f,  humidity : %f}", (float)sht31.sht31Data_.temperature, (float)sht31.sht31Data_.humidity);
+            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                                     pub_topic_temperature_sensor,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+            UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
+                        UART_PRINT("Topic: %s\n\r",pub_topic_temperature_sensor);
+                        UART_PRINT("Data: %s\n\r",json_buffer);
+        }
+
         else if(BROKER_DISCONNECTION == RecvQue)    // Si es porque se ha producido una desconexion se termina
         {
             iConnBroker--;
@@ -1459,12 +1464,13 @@ void moistureTask (void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-        uint32_t sample = 0;
-        sample = analogReadMoisture();
-        double voltage;
-        voltage = sample * (1.467/4096);                                             // Calcular si es 4096 o 4095
-        UART_PRINT("\n Code: %lu   Voltage: %f", sample,voltage);
-        osi_Sleep(10000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
+//        float voltage;
+//        analogReadMoisture(&voltage);
+//        UART_PRINT("\n Voltage: %f",voltage);
+//        osi_Sleep(10000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
+        osi_messages var = MOISTURE_REPORT;
+        osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
+        osi_Sleep(5000);
     }
 }
 
@@ -1472,12 +1478,13 @@ void waterLevelTask (void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-//          readWaterLevel();
-//          osi_Sleep(3000);
+        setupWaterLevel();
+        osi_Sleep(10000);
+        readWaterLevel();
 //        MAP_GPIOPinWrite(GPIOA0_BASE, PIN_62,PIN_62);
 //        osi_Sleep(3000);
 //        MAP_GPIOPinWrite(GPIOA0_BASE, PIN_62, ~PIN_62);
-        osi_Sleep(3000000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
+//        osi_Sleep(300000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
     }
 }
 
@@ -1485,13 +1492,11 @@ void temperatureTask (void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-       // PONER ALGUN STOPER PARA QUE NO EMPIEZE ANTES DE ARRANCAR TODO
-       osi_Sleep(5000);
-       float  temperature;
-       float  humidity;
-       getTemperature(&temperature, &humidity);
-       UART_PRINT("\n TEMPERATURE: %f", temperature);
-       UART_PRINT("\n HUMIDITY: %f", humidity);
+//        xEventGroupWaitBits(FlagAcc, ACC_ON,pdFALSE,pdFALSE,portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
+        osi_messages var = TEMPERATURE_REPORT;
+        osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
+        osi_Sleep(5000);
+
 
     }
 }
@@ -1573,6 +1578,12 @@ void main()
     }
 
 
+//    sensorsQueue = xQueueCreate(10,sizeof(sensorsData));
+//    if (sensorsQueue==NULL)
+//    {
+//        while(1);
+//    }
+
     //
     // Comenzar la tarea que gestiona cuando se debe reportar el valor de los aceleracion
     //
@@ -1613,23 +1624,7 @@ void main()
     }
 
 
-    moistureMeasures = xEventGroupCreate();              // Crear el grupo de eventos para la aceleracion
-    if( moistureMeasures == NULL )
-    {
-       while(1);
-    }
 
-    waterLevelMeasures  = xEventGroupCreate();              // Crear el grupo de eventos para la aceleracion
-    if( waterLevelMeasures  == NULL )
-    {
-       while(1);
-    }
-
-    temperatureMeasures  = xEventGroupCreate();              // Crear el grupo de eventos para la aceleracion
-    if( temperatureMeasures  == NULL )
-    {
-       while(1);
-    }
 
     //
     // Start the task scheduler
