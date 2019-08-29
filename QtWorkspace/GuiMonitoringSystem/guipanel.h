@@ -32,11 +32,12 @@ private slots:
     void onMQTT_subacked(quint16 msgid, quint8 qos);
 
     //Slots botones (creados automaticamente)
-    void on_startButton_clicked();            // Funcion que se ejecuta al pulsar el boton "Start"
+    void on_connectButton_clicked();            // Funcion que se ejecuta al pulsar el boton "Start"
     void on_stateButton_clicked();           // Funcion que se ejecuta al pulsar el boton "State"
     void on_pingButton_clicked();           // Funcion que se ejecuta al pulsar el boton "Ping"
     void on_tempEnable_toggled(bool checked);
     void on_moistEnable_toggled(bool checked);
+    void on_freq_valueChanged(double value);
 
 private:
     // Funciones privadas

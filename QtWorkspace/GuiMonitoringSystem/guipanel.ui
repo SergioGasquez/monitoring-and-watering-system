@@ -103,7 +103,7 @@
     <string>MQTT Broker: </string>
    </property>
   </widget>
-  <widget class="QPushButton" name="startButton">
+  <widget class="QPushButton" name="connectButton">
    <property name="geometry">
     <rect>
      <x>350</x>
@@ -118,7 +118,7 @@
     </font>
    </property>
    <property name="text">
-    <string>Start</string>
+    <string>Connect</string>
    </property>
   </widget>
   <widget class="QTabWidget" name="tabWidget">
@@ -135,7 +135,7 @@
    </property>
    <widget class="QWidget" name="generalTab">
     <attribute name="title">
-     <string>Tab 1</string>
+     <string>General</string>
     </attribute>
     <widget class="QGroupBox" name="groupAmbient">
      <property name="geometry">
@@ -193,25 +193,6 @@
       </property>
       <property name="digitOffset">
        <double>10.000000000000000</double>
-      </property>
-     </widget>
-     <widget class="QCheckBox" name="tempEnable">
-      <property name="geometry">
-       <rect>
-        <x>10</x>
-        <y>30</y>
-        <width>131</width>
-        <height>41</height>
-       </rect>
-      </property>
-      <property name="font">
-       <font>
-        <pointsize>14</pointsize>
-        <italic>false</italic>
-       </font>
-      </property>
-      <property name="text">
-       <string>Enable</string>
       </property>
      </widget>
      <widget class="QLabel" name="labelTemperature">
@@ -350,25 +331,6 @@
        <double>10.000000000000000</double>
       </property>
      </widget>
-     <widget class="QCheckBox" name="moistEnable">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>40</y>
-        <width>131</width>
-        <height>41</height>
-       </rect>
-      </property>
-      <property name="font">
-       <font>
-        <pointsize>14</pointsize>
-        <italic>false</italic>
-       </font>
-      </property>
-      <property name="text">
-       <string>Enable</string>
-      </property>
-     </widget>
     </widget>
     <widget class="QGroupBox" name="groupWaterLevel">
      <property name="geometry">
@@ -428,27 +390,8 @@
        <double>10.000000000000000</double>
       </property>
      </widget>
-     <widget class="QCheckBox" name="waterLevelEnable">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>40</y>
-        <width>131</width>
-        <height>41</height>
-       </rect>
-      </property>
-      <property name="font">
-       <font>
-        <pointsize>14</pointsize>
-        <italic>false</italic>
-       </font>
-      </property>
-      <property name="text">
-       <string>Enable</string>
-      </property>
-     </widget>
     </widget>
-    <widget class="QLabel" name="freqWaterLevel_2">
+    <widget class="QLabel" name="freqLabel">
      <property name="geometry">
       <rect>
        <x>190</x>
@@ -466,7 +409,7 @@
       <string>Measurement Frequency:</string>
      </property>
     </widget>
-    <widget class="QwtCounter" name="freqWaterLevel">
+    <widget class="QwtCounter" name="freq">
      <property name="geometry">
       <rect>
        <x>440</x>
@@ -511,7 +454,7 @@
      <bool>true</bool>
     </property>
     <attribute name="title">
-     <string>Page</string>
+     <string>Ambient Graph</string>
     </attribute>
     <widget class="QwtPlot" name="ambientGraph">
      <property name="geometry">
@@ -526,7 +469,7 @@
    </widget>
    <widget class="QWidget" name="moistureTab">
     <attribute name="title">
-     <string>Tab 2</string>
+     <string>Moisture Graph</string>
     </attribute>
     <widget class="QwtPlot" name="moistureGraph">
      <property name="geometry">
@@ -541,7 +484,7 @@
    </widget>
    <widget class="QWidget" name="waterTab">
     <attribute name="title">
-     <string>Page</string>
+     <string>Watering</string>
     </attribute>
     <widget class="QPushButton" name="watterButton">
      <property name="geometry">
@@ -722,6 +665,76 @@
      </property>
     </widget>
    </widget>
+  </widget>
+  <widget class="QSlider" name="measurmentSwitch">
+   <property name="geometry">
+    <rect>
+     <x>780</x>
+     <y>10</y>
+     <width>61</width>
+     <height>31</height>
+    </rect>
+   </property>
+   <property name="maximum">
+    <number>1</number>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Horizontal</enum>
+   </property>
+  </widget>
+  <widget class="QwtTextLabel" name="startLabel">
+   <property name="geometry">
+    <rect>
+     <x>610</x>
+     <y>0</y>
+     <width>151</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>15</pointsize>
+    </font>
+   </property>
+   <property name="plainText">
+    <string>Measurements: </string>
+   </property>
+  </widget>
+  <widget class="QwtTextLabel" name="onLabel">
+   <property name="geometry">
+    <rect>
+     <x>760</x>
+     <y>40</y>
+     <width>51</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>10</pointsize>
+    </font>
+   </property>
+   <property name="plainText">
+    <string>On</string>
+   </property>
+  </widget>
+  <widget class="QwtTextLabel" name="offLabel">
+   <property name="geometry">
+    <rect>
+     <x>810</x>
+     <y>40</y>
+     <width>51</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>10</pointsize>
+    </font>
+   </property>
+   <property name="plainText">
+    <string>Off</string>
+   </property>
   </widget>
  </widget>
  <layoutdefault spacing="6" margin="11"/>

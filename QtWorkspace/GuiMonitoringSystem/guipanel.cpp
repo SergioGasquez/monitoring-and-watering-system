@@ -60,6 +60,7 @@ GUIPanel::GUIPanel(QWidget *parent) :                // Constructor de la clase
 //    //Deshabilita la interfaz hasta que se establezca la conexion
       ui->tabWidget->setEnabled(false);
       ui->pingButton->setEnabled(false);
+      ui->measurmentSwitch->setEnabled(false);
 
 
     //Configuramos la moistureGraph
@@ -158,9 +159,10 @@ void GUIPanel::pingRecived(bool response)
 // Funcion de habilitacion del boton de inicio/conexion
 void GUIPanel::activateRunButton()
 {
-    ui->startButton->setEnabled(true);
+    ui->connectButton->setEnabled(true);
     ui->tabWidget->setEnabled(false);
     ui->pingButton->setEnabled(false);
+    ui->measurmentSwitch->setEnabled(false);
 }
 
 void GUIPanel::onMQTT_subscribed(const QString &topic)
@@ -414,13 +416,14 @@ void GUIPanel::SendMessage(QJsonDocument mensaje)
 }
 
 // SLOT asociada a pulsación del botón Start
-void GUIPanel::on_startButton_clicked()
+void GUIPanel::on_connectButton_clicked()
 {
     startClient();
     // Habilitamos las partes del interfaz necesarias
-    ui->startButton->setEnabled(false);
+    ui->connectButton->setEnabled(false);
     ui->pingButton->setEnabled(true);
     ui->tabWidget->setEnabled(true);
+    ui->measurmentSwitch->setEnabled(true);
 }
 
 //Al pulsar el boton Ping , envia el comando de ping
@@ -439,7 +442,7 @@ void GUIPanel::on_tempEnable_toggled(bool checked)
 {
     temperatureEnabled_ = checked;                           // Activamos o desactivamos la variable que observa si esperamos respuesta de este mensaje
     QJsonObject objeto_json;
-    objeto_json["temperatureEnable"]=checked;   // Creamos el mensaje y lo enviamos
+    objeto_json["ambientEnable"]=checked;   // Creamos el mensaje y lo enviamos
     QJsonDocument mensaje(objeto_json);
     SendMessage(mensaje);
 }
@@ -452,14 +455,15 @@ void GUIPanel::on_moistEnable_toggled(bool checked)
     QJsonDocument mensaje(objeto_json);
     SendMessage(mensaje);
 }
-/*
+
 //Envia el valor de frecuencia de medicion de la temperatura cuando se cambia su valor desde la interfaz
-void GUIPanel::on_tempfreq_valueChanged(double value)
+void GUIPanel::on_freq_valueChanged(double value)
 {
     QJsonObject objeto_json;
-    objeto_json["tempFreq"]=value;              // Creamos el mensaje y lo enviamos con el valor de la rueda
+    objeto_json["measuresFreq"]=value;              // Creamos el mensaje y lo enviamos con el valor de la rueda
     QJsonDocument mensaje(objeto_json);
     SendMessage(mensaje);
 }
-*/
+
+
 
