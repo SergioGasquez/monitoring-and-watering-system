@@ -16,19 +16,17 @@
 #include <fstream>
 #include <string>
 
+#include <time.h>
+#include <iomanip>
+
+
 
 constexpr const char * TOPIC_PC                     = "/PC";       // Topic en el que se publican los mensajes de PC a CC3200
 constexpr const char * TOPIC_CC3200                 = "/cc3200/#"; // Topic en el que recibiremos los mensajes de CC3200. Al usar #, nos subscribimos a todos sus subtopics
 
 /*
 // Subtopics (no se usan porque se subscribe solo al topic superior)
-constexpr const char * TOPIC_LED                    = "/cc3200/LEDs";
-constexpr const char * TOPIC_TEMP                   = "/cc3200/TEMP";
-constexpr const char * TOPIC_ACC                    = "/cc3200/ACC";
-constexpr const char * TOPIC_CHECK_BUTTONS          = "/cc3200/BUTTONS";
-constexpr const char * TOPIC_CHECK_BUTTONS_ASYNC    = "/cc3200/BUTTONS_ASYNC";
-constexpr const char * TOPIC_MODE                   = "/cc3200/MODE";
-constexpr const char * TOPIC_PWM                    = "/cc3200/PWM";
+constexpr const char * TOPIC_SENSORS                    = "/cc3200/SENSORS";
 constexpr const char * TOPIC_PING                   = "/cc3200/PING";
 */
 
@@ -40,9 +38,11 @@ GUIPanel::GUIPanel(QWidget *parent) :                // Constructor de la clase
     ui(new Ui::GUIPanel),                            // Indica que guipanel.ui es el interfaz grafico de la clase
    transactionCount(0),
    pinged_(false),                                   // Inicializamos las variables que controlan que topics esperamos
-   temperatureEnabled_(false),
-   moistureEnable_(false),
-   waterLevelEnable_(false)
+   fileInitialized_(false),
+   filename_(""),
+   wateringTime_(0),
+   waterMoistureSlider_(0),
+   waterTemperatureSlider_(0)
 {
     ui->setupUi(this);                              // Conecta la clase con su interfaz gráfico.
     setWindowTitle(tr("Interfaz de Control"));      // Título de la ventana
@@ -57,26 +57,30 @@ GUIPanel::GUIPanel(QWidget *parent) :                // Constructor de la clase
 
     connected=false;                 // Todavía no hemos establecido la conexión USB
 
-//    //Deshabilita la interfaz hasta que se establezca la conexion
-      ui->tabWidget->setEnabled(false);
-      ui->pingButton->setEnabled(false);
-      ui->measurmentSwitch->setEnabled(false);
+    // Deshabilita la interfaz hasta que se establezca la conexion
+    ui->tabWidget->setEnabled(false);
+    ui->pingButton->setEnabled(false);
+    ui->measurmentSwitch->setEnabled(false);
 
+    ui->temperature->setValue(0);
+    ui->humidity->setValue(0);
+    ui->moisture->setValue(0);
+    ui->waterLevel->setValue(0);
 
-    //Configuramos la moistureGraph
+    // Configuramos la moistureGraph
     ui->moistureGraph->setAxisTitle(QwtPlot::xBottom,"Sample Number");   // Titulo de los ejes
     ui->moistureGraph->setAxisTitle(QwtPlot::yLeft, "%");
     ui->moistureGraph->setAxisScale(QwtPlot::yLeft, 0.0, 100.0);          // Con escala definida
     ui->moistureGraph->setAutoReplot(false);
 
-    //Creamos una curva y la añadimos a la moistureGraph
+    // Creamos una curva y la añadimos a la moistureGraph
     m_Moisture = new QwtPlotCurve();
     m_Moisture->setPen(QPen(Qt::red));
     mMoisture_Grid = new QwtPlotGrid();
     mMoisture_Grid->attach(ui->moistureGraph);
     m_Moisture->attach(ui->moistureGraph);
 
-    //Inicializadmos los datos que se muestran en la moistureGraph
+    // Inicializadmos los datos que se muestran en la moistureGraph
     for (int i=0; i<NMAX; i++)
     {
         yValMoisture[i]=0;
@@ -85,25 +89,24 @@ GUIPanel::GUIPanel(QWidget *parent) :                // Constructor de la clase
     m_Moisture->setRawSamples(xValMoisture,yValMoisture,NMAX);
     ui->moistureGraph->replot();
 
-//    //Configuramos la ambientGraph
+    // Configuramos la ambientGraph
     ui->ambientGraph->setAxisTitle(QwtPlot::xBottom,"Sample Number");   // Titulo de los ejes
     ui->ambientGraph->setAxisTitle(QwtPlot::yLeft, "ºC/%");
     ui->ambientGraph->setAxisScale(QwtPlot::yLeft, 0.0, 100.0);          // Con escala definida
     ui->ambientGraph->setAutoReplot(false);
 
-//    ///Creamos una curva y la añadimos a la accGraph
+    // Creamos una curva y la añadimos a la moistureGraph
     m_curve_temp = new QwtPlotCurve();
     m_curve_temp->setPen(QPen(Qt::red));
     m_Ambient_Grid = new QwtPlotGrid();
     m_Ambient_Grid->attach(ui->ambientGraph);
     m_curve_temp->attach(ui->ambientGraph);
 
-//    //Creamos una curva y la añadimos a la accGraph
     m_curve_hum = new QwtPlotCurve();
     m_curve_hum->setPen(QPen(Qt::blue));
     m_curve_hum->attach(ui->ambientGraph);
 
-//    //Inicializadmos los datos que se muestran en la accGraph
+    // Inicializadmos los datos que se muestran en la moistureGraph
     for (int i=0; i<NMAX; i++) {
         yValTemp[i]=0;
         yValHum[i]=0;
@@ -201,162 +204,31 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                 pingRecived(pingResponse.toBool());
             }
 
-//            QJsonValue checkButtonCommand=objeto_json["checkButtons"];              // Como estamos subscritos al topic de PC, recibe los propios mensajes que envia
-//            bool checkButtonResponse = !(checkButtonCommand.toBool());              // Por lo que si no ponemos esta condicion al usar el boton check value, el primer
-//            if(checkButtonResponse)                                                 // Comando que recibimos, es el propio que enviamos nosotros ({"checkButtons" : true})
-//            {                                                                       // Por lo que este comando pondria checkButtons_ a false y no se actualizarian los estados
-//                // Actualizar valor de los botones                                  // De los botones
-//                if(async_ || checkButtons_)
-//                {
-//                    QJsonValue checkButton1=objeto_json["button1"];
-//                    bool button1 = checkButton1.toBool();
-//                    ui->button1State->setChecked(button1);
-//                    QJsonValue checkButton2=objeto_json["button2"];
-//                    bool button2 = checkButton2.toBool();
-//                    ui->button2State->setChecked(button2);
-//                    checkButtons_ = false;
-//                }
-//            }
-
-
-
             // Actualizar temperatura
-            if(temperatureEnabled_)
+
+            QJsonValue temperature=objeto_json["temperature"];
+            QJsonValue humidity=objeto_json["humidity"];
+            QJsonValue moisture=objeto_json["moisture"];
+            if ((temperature != QJsonValue::Null) || (humidity != QJsonValue::Null) || (moisture != QJsonValue::Null))
             {
-                QJsonValue temperature=objeto_json["temperature"];
-                QJsonValue humidity=objeto_json["humidity"];
-                if (temperature != QJsonValue::Null && humidity != QJsonValue::Null)
-                {
-                    ui->temperature->setValue(temperature.toDouble());
-                    ui->humidity->setValue(humidity.toDouble());
-                    memmove(yValTemp,yValTemp+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
-                    yValTemp[NMAX-1]=temperature.toDouble();    //Añadimos el último punto
-                    m_curve_temp->setRawSamples(xVal,yValTemp,NMAX);          //Refrescamos..
-                    memmove(yValHum,yValHum+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
-                    yValHum[NMAX-1]=humidity.toDouble();    //Añadimos el último punto
-                    m_curve_hum->setRawSamples(xVal,yValHum,NMAX);
-                    ui->ambientGraph->replot();
+                ui->temperature->setValue(temperature.toDouble());
+                ui->humidity->setValue(humidity.toDouble());
+                memmove(yValTemp,yValTemp+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
+                yValTemp[NMAX-1]=temperature.toDouble();    //Añadimos el último punto
+                m_curve_temp->setRawSamples(xVal,yValTemp,NMAX);          //Refrescamos..
+                memmove(yValHum,yValHum+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
+                yValHum[NMAX-1]=humidity.toDouble();    //Añadimos el último punto
+                m_curve_hum->setRawSamples(xVal,yValHum,NMAX);
+                ui->ambientGraph->replot();
+                ui->moisture->setValue(moisture.toDouble());
+                memmove(yValMoisture,yValMoisture+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
+                yValMoisture[NMAX-1]=moisture.toDouble();    //Añadimos el último punto
+                m_Moisture->setRawSamples(xValMoisture,yValMoisture,NMAX);          //Refrescamos..
+                ui->moistureGraph->replot();
 
-                }
-            }
-
-            if(moistureEnable_)
-            {
-                QJsonValue moisture=objeto_json["moisture"];
-                if (moisture != QJsonValue::Null)
-                {
-                    ui->moisture->setValue(moisture.toDouble());
-                    memmove(yValMoisture,yValMoisture+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
-                    yValMoisture[NMAX-1]=moisture.toDouble();    //Añadimos el último punto
-                    m_Moisture->setRawSamples(xValMoisture,yValMoisture,NMAX);          //Refrescamos..
-                    ui->moistureGraph->replot();
-
-                    std::ofstream os("Moisture.txt", std::ios_base::app);
-                    if(os.is_open()){
-                     os << std::endl << std::to_string(moisture.toDouble())  ;
-                     os.flush();
-                    }
-                }
+                saveData(temperature.toDouble(), humidity.toDouble(), moisture.toDouble());
 
             }
-
-
-//            // Actualizar aceleración
-//            if(acc_)
-//            {
-//                QJsonValue x_acc=objeto_json["x_acc"];
-//                QJsonValue y_acc=objeto_json["y_acc"];
-//                QJsonValue z_acc=objeto_json["z_acc"];
-//                memmove(yVal1,yVal1+1,sizeof(double)*(NMAX-1));     //Desplazamos las muestras hacia la izquierda
-//                memmove(yVal2,yVal2+1,sizeof(double)*(NMAX-1));
-//                memmove(yVal3,yVal3+1,sizeof(double)*(NMAX-1));
-//                yVal1[NMAX-1]=2.0*(double)(x_acc.toInt())/128.0;    //Añadimos el último punto
-//                yVal2[NMAX-1]=2.0*(double)(y_acc.toInt())/128.0;
-//                yVal3[NMAX-1]=2.0*(double)(z_acc.toInt())/128.0;
-//                m_curve_1->setRawSamples(xVal,yVal1,NMAX);          //Refrescamos..
-//                m_curve_2->setRawSamples(xVal,yVal2,NMAX);
-//                m_curve_3->setRawSamples(xVal,yVal3,NMAX);
-//                ui->accGraph->replot();
-//            }
-
-//            // En caso de que los valores de la interfaz se cambien de forma externa, la actualiamos:
-
-//            // Actualizar el valor de los checks de los leds en caso de cambiarlos de forma externa
-//            QJsonValue redLed=objeto_json["redLed"];
-//            QJsonValue orangeLed=objeto_json["orangeLed"];
-//            QJsonValue greenLed=objeto_json["greenLed"];
-//            bool previousblockinstate,checked;
-//            if (redLed.isBool())
-//            {
-
-//                checked=redLed.toBool();
-//                previousblockinstate=ui->redLed->blockSignals(true);
-
-//                ui->redLed->setChecked(checked);
-//                ui->redLed->blockSignals(previousblockinstate);
-//            }
-//            if (orangeLed.isBool())
-//            {
-
-//                checked=orangeLed.toBool();
-//                previousblockinstate=ui->orangeLed->blockSignals(true);
-
-//                ui->orangeLed->setChecked(checked);
-//                ui->orangeLed->blockSignals(previousblockinstate);
-//            }
-//            if (greenLed.isBool())
-//            {
-
-//                checked=greenLed.toBool();
-//                previousblockinstate=ui->greenLed->blockSignals(true);
-
-//                ui->greenLed->setChecked(checked);
-//                ui->greenLed->blockSignals(previousblockinstate);
-//            }
-//            // Actualizar el valor del desplegable de modo
-//            QJsonValue mode=objeto_json["mode"];
-//            if(mode.isDouble())
-//            {
-//                int modeSelected = (int)mode.toDouble();
-//                ui->modeSelect->setCurrentIndex(modeSelected);
-//                mode_=(uint8_t)(modeSelected);
-//            }
-//            // Actualizar el valor de los botones
-//            QJsonValue checkButtons=objeto_json["checkButtons"];
-//            if (checkButtons.isBool())
-//            {
-//                checkButtons_=checkButtons.toBool();
-//            }
-//            // Actualizar el valor del modo async
-//            QJsonValue async=objeto_json["checkButtonsAsync"];
-//            if (async.isBool())
-//            {
-//                async_=async.toBool();
-//                previousblockinstate=ui->async->blockSignals(true);
-
-//                ui->async->setChecked(async_);
-//                ui->async->blockSignals(previousblockinstate);
-//            }
-//            // Actualizar si se ha iniciado la medicion de temperatura
-//            QJsonValue tempStart=objeto_json["tempStart"];
-//            if (tempStart.isBool())
-//            {
-//                temp_=tempStart.toBool();
-//                previousblockinstate=ui->start_Temp->blockSignals(true);
-
-//                ui->start_Temp->setChecked(temp_);
-//                ui->start_Temp->blockSignals(previousblockinstate);
-//            }
-//            // Actualizar si se ha iniciado la medicion de aceleracion
-//            QJsonValue accStart=objeto_json["accStart"];
-//            if (accStart.isBool())
-//            {
-//                acc_=accStart.toBool();
-//                previousblockinstate=ui->start->blockSignals(true);
-
-//                ui->start->setChecked(acc_);
-//                ui->start->blockSignals(previousblockinstate);
-//            }
 
         }
     }
@@ -415,6 +287,41 @@ void GUIPanel::SendMessage(QJsonDocument mensaje)
 
 }
 
+void GUIPanel::saveData(double temperature, double humidity, double moisture)
+{
+    if (!fileInitialized_)
+    {
+        std::time_t t = std::time(nullptr);
+        char aux[100];
+        if (std::strftime(aux, sizeof(aux), " %D %I %M %S", std::localtime(&t))) {
+            std::cout << aux << '\n';
+        }
+        aux[3] = '-';
+        aux[6] = '-';
+        aux[9] = '_';
+        aux[12] = '-';
+        aux[15] = '-';
+        std::string buffer;
+        buffer.append(aux);
+        filename_ = buffer + ".txt";
+        std::ofstream os(filename_.c_str(), std::ios_base::app);
+        if(os.is_open())
+        {
+            os << "temperature, humidity, moisture \n";
+            os.flush();
+        }
+        fileInitialized_ = true;
+    }
+
+    std::ofstream os(filename_.c_str(), std::ios_base::app);
+    if(os.is_open())
+    {
+        os << std::endl << std::to_string(temperature) << ", " << std::to_string(humidity) << ", " << std::to_string(moisture);
+        os.flush();
+    }
+}
+
+
 // SLOT asociada a pulsación del botón Start
 void GUIPanel::on_connectButton_clicked()
 {
@@ -437,23 +344,51 @@ void GUIPanel::on_pingButton_clicked()
     SendMessage(mensaje);
 }
 
-//Slots asociado a los checkboxes de los LEDs
-void GUIPanel::on_tempEnable_toggled(bool checked)
+void GUIPanel::on_measurmentSwitch_valueChanged(int  value)
 {
-    temperatureEnabled_ = checked;                           // Activamos o desactivamos la variable que observa si esperamos respuesta de este mensaje
     QJsonObject objeto_json;
-    objeto_json["ambientEnable"]=checked;   // Creamos el mensaje y lo enviamos
+    objeto_json["measurementSwitch"]=value;              // Creamos el mensaje y lo enviamos con el valor de la rueda
     QJsonDocument mensaje(objeto_json);
     SendMessage(mensaje);
 }
 
-void GUIPanel::on_moistEnable_toggled(bool checked)
+void GUIPanel::on_waterTimeSlider_valueChanged(double value)
 {
-    moistureEnable_ = checked;                           // Activamos o desactivamos la variable que observa si esperamos respuesta de este mensaje
+    wateringTime_ = value;
+}
+void GUIPanel::on_waterButton_clicked()
+{
     QJsonObject objeto_json;
-    objeto_json["moistureEnable"]=checked;   // Creamos el mensaje y lo enviamos
+    objeto_json["wateringTime"]=wateringTime_;              // Creamos el mensaje y lo enviamos con el valor de la rueda
     QJsonDocument mensaje(objeto_json);
     SendMessage(mensaje);
+}
+
+void GUIPanel::on_waterMoistureSlider_valueChanged(double value)
+{
+    waterMoistureSlider_ = value;
+}
+void GUIPanel::on_waterTemperatureSlider_valueChanged(double value)
+{
+    waterTemperatureSlider_ = value;
+}
+void GUIPanel::on_waterParamsSet_clicked()
+{
+    if(waterMoistureSlider_ > 0 && waterTemperatureSlider_ > 0)     // TODO: FIJAR LOS VALORES ESTOS CON SENTIDO
+    {
+        QJsonObject objeto_json;
+        objeto_json["moistureThreshold"]=waterMoistureSlider_;              // Creamos el mensaje y lo enviamos con el valor de la rueda
+        QJsonDocument mensaje(objeto_json);
+        //SendMessage(mensaje);
+        objeto_json["temperatureThreshold"]=waterTemperatureSlider_;              // TENGO QUE HACER ALGO PARA QUE SEA SOLO UN MENSAJE CON LOS DOS TH
+        mensaje = QJsonDocument (objeto_json);
+        SendMessage(mensaje);
+    }
+    else
+    {
+        QMessageBox ventanaPopUp(QMessageBox::Information,tr("Evento"),tr("Thresholds cant be the minimum"),QMessageBox::Ok,this,Qt::Popup);
+        ventanaPopUp.exec();
+    }
 }
 
 //Envia el valor de frecuencia de medicion de la temperatura cuando se cambia su valor desde la interfaz

@@ -423,6 +423,9 @@
        <pointsize>15</pointsize>
       </font>
      </property>
+     <property name="minimum">
+      <double>1.000000000000000</double>
+     </property>
      <property name="maximum">
       <double>90.000000000000000</double>
      </property>
@@ -486,7 +489,7 @@
     <attribute name="title">
      <string>Watering</string>
     </attribute>
-    <widget class="QPushButton" name="watterButton">
+    <widget class="QPushButton" name="waterButton">
      <property name="geometry">
       <rect>
        <x>640</x>
@@ -504,7 +507,7 @@
       <string>Water</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="waterParamsFix">
+    <widget class="QPushButton" name="waterParamsSet">
      <property name="geometry">
       <rect>
        <x>620</x>
@@ -584,7 +587,7 @@
       <enum>Qt::Horizontal</enum>
      </property>
     </widget>
-    <widget class="QwtSlider" name="waterTimeSlider_2">
+    <widget class="QwtSlider" name="waterTemperatureSlider">
      <property name="geometry">
       <rect>
        <x>150</x>
@@ -603,7 +606,7 @@
       <enum>Qt::Vertical</enum>
      </property>
     </widget>
-    <widget class="QwtSlider" name="waterTimeSlider_3">
+    <widget class="QwtSlider" name="waterMoistureSlider">
      <property name="geometry">
       <rect>
        <x>430</x>
@@ -664,6 +667,45 @@
       <string>Soil Moisture:</string>
      </property>
     </widget>
+    <widget class="QwtTextLabel" name="secondsLabel">
+     <property name="geometry">
+      <rect>
+       <x>290</x>
+       <y>140</y>
+       <width>100</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="plainText">
+      <string>Seconds</string>
+     </property>
+    </widget>
+    <widget class="QwtTextLabel" name="tempUnitsLabel">
+     <property name="geometry">
+      <rect>
+       <x>220</x>
+       <y>260</y>
+       <width>31</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="plainText">
+      <string>ºC</string>
+     </property>
+    </widget>
+    <widget class="QwtTextLabel" name="moistUnitsLabel">
+     <property name="geometry">
+      <rect>
+       <x>500</x>
+       <y>260</y>
+       <width>31</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="plainText">
+      <string>%</string>
+     </property>
+    </widget>
    </widget>
   </widget>
   <widget class="QSlider" name="measurmentSwitch">
@@ -703,7 +745,7 @@
   <widget class="QwtTextLabel" name="onLabel">
    <property name="geometry">
     <rect>
-     <x>760</x>
+     <x>810</x>
      <y>40</y>
      <width>51</width>
      <height>20</height>
@@ -721,7 +763,7 @@
   <widget class="QwtTextLabel" name="offLabel">
    <property name="geometry">
     <rect>
-     <x>810</x>
+     <x>760</x>
      <y>40</y>
      <width>51</width>
      <height>20</height>

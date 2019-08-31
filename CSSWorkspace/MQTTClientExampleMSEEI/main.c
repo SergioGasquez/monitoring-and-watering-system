@@ -121,20 +121,17 @@
 #define RETAIN                  1
 
 /*Topics a los que va a publicar*/
-#define PUB_TOPIC_MOISTURE_SENSOR  "/cc3200/MoistureSensor"
-#define PUB_TOPIC_WATER_LEVEL_SENSOR  "/cc3200/WaterLevelSensor"
-#define PUB_TOPIC_TEMPERATURE_SENSOR  "/cc3200/TemperatureSensor"
+#define PUB_TOPIC_SENSORS  "/cc3200/Sensors"
+
 /*Numero de topics a los que se va a subscribir*/
 #define TOPIC_COUNT             1
 
 /*Defining Subscription Topic Values*/
 #define TOPIC_PC                "/PC"
-//#define TOPIC1                  "/cc3200/ToggleLEDCmdL1"
-//#define TOPIC2                  "/cc3200/ToggleLEDCmdL2"
-//#define TOPIC3                  "/cc3200/ToggleLEDCmdL3"
+//#define TOPIC1                  "/cc3200/SENSORS"
 //#define TOPIC_PING              "/cc3200/PING"
-//#define TOPIC_JSON              "/cc3200/LEDs"
 
+#define RELAY_PIN PIN_59
 
 
 
@@ -166,9 +163,6 @@ typedef struct connection_config{
 
 typedef enum events
 {
-//    MOISTURE_REPORT,
-//    WATER_LEVEL_REPORT,
-//    TEMPERATURE_REPORT,
     SENSORS_REPORT,
     BROKER_DISCONNECTION
 }osi_messages;
@@ -183,23 +177,24 @@ void vUARTTask( void *pvParameters );
 int echowait = 0;
 volatile int pulse= 0;
 
-static QueueHandle_t freqQueue;
-static QueueHandle_t configQueue;
+static QueueHandle_t freqQueue;             // Cola que almacena la frecuencia con la que se mide
+static QueueHandle_t thresholdsQueue;       // Cola que almacena los thresholds
+static QueueHandle_t waterQueue;            // Cola que almacena el tiempo que se riega
+
+static EventGroupHandle_t measurementFlag;
+#define MEASUREMENT_START 0x0001
+
+static EventGroupHandle_t waterFlag;
+#define WATERING_START 0x0001
+
+
 
 typedef struct {                                    // Struct para los umbrales que activan el riego
-    float temperature;
-    float moisture;
-}waterThreshold;
+    char temperature;
+    char moisture;
+}systemThresholds;
 
-typedef struct {                                    // Struct para los umbrales que activan el riego
-    bool ambientEnable;
-    bool moistureEnable ;
-    bool waterLevelEnable ;
-}systemConfig;
-
-
-
-typedef struct {                                    // Struct para almacenar los valores del sensor
+typedef struct {                                    // Struct para almacenar los valores del sensor de ambiente
     float temperature;
     float humidity;
 }sht31Data;
@@ -227,10 +222,9 @@ void LedTimerDeinitStop();
 void BoardInit(void);
 static void DisplayBanner(char * AppName);
 void ConnectWiFI(void *pvParameters);
-//void moistureTask(void *pvParameters);                   // Tarea que envia el estado de la acceleracion
-//void waterLevelTask(void *pvParameters);
-//void temperatureTask(void *pvParameters);
 void measurementsTask(void *pvParameters);
+void wateringTask (void *pvParameters);
+
 
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- Start
@@ -293,9 +287,8 @@ SlMqttClientLibCfg_t Mqtt_Client={
 };
 
 /*Conversion a char* de los topics en los que publicaremos*/
-const char *pub_topic_moisture_sensor = PUB_TOPIC_MOISTURE_SENSOR;
-const char *pub_topic_temperature_sensor = PUB_TOPIC_TEMPERATURE_SENSOR;
-const char *pub_topic_water_level_sensor = PUB_TOPIC_WATER_LEVEL_SENSOR;
+const char *pub_topic_sensors = PUB_TOPIC_SENSORS;
+
 
 
 
@@ -328,139 +321,48 @@ Mqtt_Recv(void *app_hndl, const char  *topstr, long top_len, const void *payload
                        long pay_len, bool dup,unsigned char qos, bool retain)
 {
     
-//    float value;
     char *output_str=(char*)pvPortMalloc(top_len+1);
     memset(output_str,'\0',top_len+1);
     strncpy(output_str, (char*)topstr, top_len);
     output_str[top_len]='\0';
     if (strncmp(output_str,TOPIC_PC, top_len) == 0)
     {
-        bool booleano;
-        systemConfig systemConfig_;
-        uint32_t freq;
-        if (json_scanf((const char *)payload, pay_len, "{ measuresFreq: %d }", &freq)>0)         // Si recibimos un mensaje de cambio de modo
+        systemThresholds systemThresholds_;
+        uint32_t value;
+        bool boolean;
+        if (json_scanf((const char *)payload, pay_len, "{ measuresFreq: %d }", &value)>0)         // Si recibimos un mensaje de cambio de modo
         {
-            freq = freq*1000*60;
-            xQueueOverwrite(freqQueue,&freq);
+            value = value*1000*60;
+            xQueueOverwrite(freqQueue,&value);
         }
-        if (json_scanf((const char *)payload, pay_len, "{ ambientEnable: %B }", &booleano)>0)         // Si recibimos un mensaje de cambio de modo
+        if (json_scanf((const char *)payload, pay_len, "{ measurementSwitch: %d }", &value)>0)         // Si recibimos un mensaje de cambio de modo
         {
-            xQueuePeek(configQueue,&systemConfig_,( TickType_t )10);
-            systemConfig_.ambientEnable = booleano;
-            xQueueOverwrite(configQueue,&systemConfig_);
-        }
-        if (json_scanf((const char *)payload, pay_len, "{ moistureEnable: %B }", &booleano)>0)         // Si recibimos un mensaje de cambio de modo
-        {
-            xQueuePeek(configQueue,&systemConfig_,( TickType_t )10);
-            systemConfig_.moistureEnable = booleano;
-            xQueueOverwrite(configQueue,&systemConfig_);
-        }
-        if (json_scanf((const char *)payload, pay_len, "{ waterLevelEnable: %B }", &booleano)>0)         // Si recibimos un mensaje de cambio de modo
-        {
-            xQueuePeek(configQueue,&systemConfig_,( TickType_t )10);
-            systemConfig_.waterLevelEnable = booleano;
-            xQueueOverwrite(configQueue,&systemConfig_);
-        }
-        /*
-        if (json_scanf((const char *)payload, pay_len, "{ mode: %d }", &config.mode)>0)         // Si recibimos un mensaje de cambio de modo
-        {
-            switch(config.mode)                                                                 // Fijamos el modo y realizamos las configuraciones necesarias
+            if(value)
             {
-                case 0:
-                    PWM_IF_OutputDisable();                                                     // Modo PWM deshabilitado
-                    UART_PRINT("\n\rMODE: GPIO");
-                    break;
-                case 1:
-                    PWM_IF_OutputEnable();                                                      // Modo PWM habilitado
-                    PWM_IF_SetDutycycle(config.pwmValues.red, config.pwmValues.green, config.pwmValues.orange);
-                    UART_PRINT("\n\rMODE: PWM");
-                    break;
-                case 2:
-                    MAP_PinTypeI2C(PIN_01, PIN_MODE_1);                                          // Se configura el pin PIN_01 para  I2C (I2C_SCL)
-                    MAP_PinTypeI2C(PIN_02, PIN_MODE_1);                                          // Se configura el pin PIN_02 para  I2C (I2C_SDA)
-                    UART_PRINT("\n\rMODE: I2C");
-                    break;
-                default:
-                    UART_PRINT("\n\r INCORRECT MODE");
-                    break;
+                xEventGroupSetBits(measurementFlag, MEASUREMENT_START);
+            }
+            else
+            {
+                xEventGroupClearBits(measurementFlag, MEASUREMENT_START);
             }
         }
-        if (json_scanf((const char *)payload, pay_len, "{ ping: %B }", &booleano)>0)            // Si recibimos un mensaje de ping
+        if (json_scanf((const char *)payload, pay_len, "{ wateringTime: %d }", &value)>0)         // Si recibimos un mensaje de cambio de modo
         {
-            osi_messages var = PING_REPORT;
-            osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);                                     // Pone en la cola de mensajes a enviar un mensaje del tipo PING REPORT
+            // TODO: ANYTRANSFORMATION IF NEEDED
+            value = value *1000;
+            xQueueOverwrite(waterQueue,&value);
+            xEventGroupSetBits(waterFlag,WATERING_START);
         }
-        if (json_scanf((const char *)payload, pay_len, "{ checkButtonsAsync: %B }", &booleano)>0)   // Configura el modo de lectura de botones asincrono
+        if (json_scanf((const char *)payload, pay_len, "{ temperatureThreshold: %d }", &value)>0)         // Si recibimos un mensaje de cambio de modo
         {
-            UART_PRINT("\n\r modeAsync: %d",booleano);
-            config.modeAsync = booleano;
+            systemThresholds_.temperature = value;
+            xQueueOverwrite(thresholdsQueue,&systemThresholds_); // TODO: COMPROBAR QUE SOLO REEMPLAZA ESTE VALOR
         }
-
-        if (json_scanf((const char *)payload, pay_len, "{ accStart: %B }", &config.accStarted)>0)   // Configura el arranque de la medicion de aceleraccion
+        if (json_scanf((const char *)payload, pay_len, "{ moistureThreshold: %d }", &value)>0)         // Si recibimos un mensaje de cambio de modo
         {
-            if(config.accStarted)                                                                   // Si recibimos un true, ponemos el flag ACC ON
-            {
-                xEventGroupSetBits(FlagAcc,ACC_ON);
-                config.freqAcc = 0.1;
-            }
-            else                                                                                    // Si recibimos un false, borramos ese flag
-            {
-                xEventGroupClearBits(FlagAcc,ACC_ON);
-            }
+            systemThresholds_.moisture = value;
+            xQueueOverwrite(thresholdsQueue,&systemThresholds_);    // TODO: COMPROBAR QUE SOLO REEMPLAZA ESTE VALOR
         }
-        if (json_scanf((const char *)payload, pay_len, "{ accFreq: %f }", &config.freqAcc)>0)       // Si recibimos la frecuencia a la que hay que medir la aceleraccion, solo la alamacenamos en la variable destinada a eso
-        {
-
-        }
-        if(config.mode == 0)                                                                        // Si estamos en modo GPIO
-        {
-            if (json_scanf((const char *)payload, pay_len, "{ redLed: %B }", &booleano)>0)          // Y recibimos el comando redLed encenemos/apagamos el led en funcion de lo recibido
-            {
-
-                if (booleano)
-                    GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-                else
-                    GPIO_IF_LedOff(MCU_RED_LED_GPIO);
-
-            }
-            if (json_scanf((const char *)payload, pay_len, "{ orangeLed: %B }", &booleano)>0)       // Y recibimos el comando orangeLed encenemos/apagamos el led en funcion de lo recibido
-            {
-
-                if (booleano)
-                    GPIO_IF_LedOn(MCU_ORANGE_LED_GPIO);
-                else
-                    GPIO_IF_LedOff(MCU_ORANGE_LED_GPIO);
-
-            }
-            if (json_scanf((const char *)payload, pay_len, "{ greenLed: %B }", &booleano)>0)        // Y recibimos el comando greenLed encenemos/apagamos el led en funcion de lo recibido
-            {
-
-                if (booleano)
-                    GPIO_IF_LedOn(MCU_GREEN_LED_GPIO);
-                else
-                    GPIO_IF_LedOff(MCU_GREEN_LED_GPIO);
-
-            }
-        }
-        if(config.mode == 1)                                                                        // Si estamos en modo PWM
-        {
-            if (json_scanf((const char *)payload, pay_len, "{ pwmRed: %f }", &value)>0)             // Al recibir el valor de cualquier led, llamamos a la funcion con los valores actualizados
-            {
-                config.pwmValues.red = value*65524;
-                PWM_IF_SetDutycycle(config.pwmValues.red,  config.pwmValues.orange, config.pwmValues.green);
-            }
-            if (json_scanf((const char *)payload, pay_len, "{ pwmGreen: %f }", &value)>0)
-            {
-                config.pwmValues.green =value*65524;
-                PWM_IF_SetDutycycle(config.pwmValues.red,  config.pwmValues.orange, config.pwmValues.green);
-            }
-            if (json_scanf((const char *)payload, pay_len, "{ pwmOrange: %f }", &value)>0)
-            {
-                config.pwmValues.orange = value*65524;
-                PWM_IF_SetDutycycle(config.pwmValues.red,  config.pwmValues.orange, config.pwmValues.green);
-            }
-        }
-        */
 
 
     }
@@ -564,89 +466,6 @@ sl_MqttDisconnect(void *app_hndl)
 
 }
 
-//****************************************************************************
-//
-//! Push Button Button1_ISR. Press push button2 (GPIOSW2) Whenever user
-//! wants to publish a message. Write message into message queue signaling the
-//!    event publish messages
-//!
-//! \param none
-//!
-//! return none
-//
-//****************************************************************************
-void Button1_ISR (void)
-{
-    /*
-    uint32_t status;
-    BaseType_t xHigherPriorityTaskWoken=pdFALSE;
-    UtilsDelay(8000);           //antirrebote Sw "cutre", gasta tiempo de CPU ya que las interrupciones tienen prioridad sobre las tareas
-                                //Por simplicidad lo dejamos as�...
-
-    status =  GPIOIntStatus(GPIOA1_BASE,1);     // Comprobamos el estado de la interrupcion del pin
-
-
-
-    GPIOIntClear(GPIOA1_BASE,status);                                       // Limpiamos la interrupcion
-    portYIELD_FROM_ISR( xHigherPriorityTaskWoken );                         // Miramos si hay otra tarea de mayor prioridad
-    */
-}
-
-//****************************************************************************
-//
-//! Push Button Button2_ISR. Press push button3 (GPIOSW3) Whenever user
-//! wants to publish a message. Write message into message queue signaling the
-//!    event publish messages
-//!
-//! \param none
-//!
-//! return none
-//
-//****************************************************************************
-
-void Button2_ISR (void)
-{
-    /*
-    uint32_t status;
-    BaseType_t xHigherPriorityTaskWoken=pdFALSE;
-    UtilsDelay(8000);   //antirrebote Sw "cutre", gasta tiempo de CPU ya que las interrupciones tienen prioridad sobre las tareas
-    //Por simplicidad lo dejamos as�...
-
-    status =  GPIOIntStatus(GPIOA2_BASE,1);         // Comprobamos el estado de la interrupcion del pin
-
-
-
-    GPIOIntClear(GPIOA2_BASE,status);                       // Limpiamos la interrupcion
-    portYIELD_FROM_ISR( xHigherPriorityTaskWoken );         // Miramos si hay otra tarea de mayor prioridad
-    */
-}
-//------------------------------------------------------------ -----------------------
-
-
-//Initialze Buttons and ISR
-void ButtonsInit(void)
-{
-    /*
-    //Los puertos GPIO1 y 2 ya han sido habilitados en la funci�n PinMuxConfig, por lo que no tengo que hacerlo aqui
-    // Aqui activamos las interrupciones e instalamos los manejadores de interrupci�n
-    //
-    GPIOIntTypeSet(GPIOA1_BASE,GPIO_PIN_5,GPIO_FALLING_EDGE); //Configura flanco de bajada en el PIN5
-    IntPrioritySet(INT_GPIOA1, configMAX_SYSCALL_INTERRUPT_PRIORITY); //Configura la prioridad de la ISR
-    GPIOIntRegister(GPIOA1_BASE, Button1_ISR); //Registra Button1_ISR como rutina de interrupci�n del puerto
-    GPIOIntClear(GPIOA1_BASE,GPIO_PIN_5); //Borra el flag de interrupcion
-    GPIOIntEnable(GPIOA1_BASE,GPIO_INT_PIN_5); //Habilita la interrupcion del PIN
-    IntEnable(INT_GPIOA1); //Habilita la interrupcion del puerto
-
-    //Igual configuracion para el otro boton (PIN6 del puerto 2).
-    GPIOIntTypeSet(GPIOA2_BASE,GPIO_PIN_6,GPIO_FALLING_EDGE);
-    IntPrioritySet(INT_GPIOA2, configMAX_SYSCALL_INTERRUPT_PRIORITY);
-    GPIOIntRegister(GPIOA2_BASE, Button2_ISR);
-    GPIOIntClear(GPIOA2_BASE,GPIO_PIN_6);
-    GPIOIntEnable(GPIOA2_BASE,GPIO_INT_PIN_6);
-    IntEnable(INT_GPIOA2);
-    */
-
-}
 
 
 
@@ -1289,7 +1108,7 @@ void ConnectWiFI(void *pvParameters)
     //
     // Init Push Button, enable ISRs
     //
-    ButtonsInit();
+//    ButtonsInit();
     
     //Lanza el interprete de comandos...
     lRetVal = osi_TaskCreate(vUARTTask,
@@ -1438,24 +1257,21 @@ void ConnectWiFI(void *pvParameters)
         if(SENSORS_REPORT== RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
         {
             sensorsData sensorsData_;
+            systemThresholds systemThresholds_;
             // Moisture
             struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-            systemConfig systemConfig_;
-            xQueuePeek(configQueue, &systemConfig_, ( TickType_t )10);
-            if(systemConfig_.ambientEnable)
+            getTemperature(&sensorsData_.sht31Data_.temperature, &sensorsData_.sht31Data_.humidity);
+            analogReadMoisture(&sensorsData_.moisture_);
+            xQueuePeek(thresholdsQueue, &systemThresholds_, ( TickType_t )10);
+            if(systemThresholds_.temperature >= sensorsData_.sht31Data_.temperature && systemThresholds_.moisture >= &sensorsData_.moisture_)
             {
-                getTemperature(&sensorsData_.sht31Data_.temperature, &sensorsData_.sht31Data_.humidity);
-
-            }
-            if(systemConfig_.moistureEnable)
-            {
-                analogReadMoisture(&sensorsData_.moisture_);
+                xEventGroupSetBits(waterFlag,WATERING_START);
             }
             json_printf(&out1,"{moisture : %f, temperature : %f,  humidity : %f}", (float)sensorsData_.moisture_, (float)sensorsData_.sht31Data_.temperature, (float)sensorsData_.sht31Data_.humidity);
             sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                     pub_topic_temperature_sensor,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+                                     pub_topic_sensors,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
             UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-                        UART_PRINT("Topic: %s\n\r",pub_topic_temperature_sensor);
+                        UART_PRINT("Topic: %s\n\r",pub_topic_sensors);
                         UART_PRINT("Data: %s\n\r",json_buffer);
         }
 
@@ -1493,57 +1309,13 @@ end:
 
 
 
-/*
- * Tarea que espera a que se activen los flgas y envia el comando de reportar
- */
-//void moistureTask (void *pvParameters)
-//{
-//    for( ;; )                                                                       // Debemos tener un bucle infinito
-//    {
-////        float voltage;
-////        analogReadMoisture(&voltage);
-////        UART_PRINT("\n Voltage: %f",voltage);
-////        osi_Sleep(10000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
-//        osi_messages var = MOISTURE_REPORT;
-//        osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
-//        osi_Sleep(5000);
-//    }
-//}
-
-//void waterLevelTask (void *pvParameters)
-//{
-//    for( ;; )                                                                       // Debemos tener un bucle infinito
-//    {
-//        setupWaterLevel();
-//        osi_Sleep(10000);
-//        readWaterLevel();
-//        MAP_GPIOPinWrite(GPIOA0_BASE, PIN_62,PIN_62);
-//        osi_Sleep(3000);
-//        MAP_GPIOPinWrite(GPIOA0_BASE, PIN_62, ~PIN_62);
-//        osi_Sleep(300000);                                                             // Dormimos la funcion para que se despierte con la frecuencia deseada
-//    }
-//}
-
-//void temperatureTask (void *pvParameters)
-//{
-//    for( ;; )                                                                       // Debemos tener un bucle infinito
-//    {
-////        xEventGroupWaitBits(FlagAcc, ACC_ON,pdFALSE,pdFALSE,portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
-//        osi_messages var = TEMPERATURE_REPORT;
-//        osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
-//        osi_Sleep(5000);
-//
-//
-//    }
-//}
 
 void measurementsTask (void *pvParameters)
 {
-
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-        uint32_t samplingFreq = 3000;
-//        xEventGroupWaitBits(FlagAcc, ACC_ON,pdFALSE,pdFALSE,portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
+        uint32_t samplingFreq = 60000;
+        xEventGroupWaitBits(measurementFlag, MEASUREMENT_START, pdFALSE, pdFALSE, portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
         osi_messages var = SENSORS_REPORT;
         osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
         xQueuePeek(freqQueue,&samplingFreq, ( TickType_t )10);
@@ -1551,6 +1323,21 @@ void measurementsTask (void *pvParameters)
         osi_Sleep(samplingFreq);
 
 
+    }
+}
+
+
+void wateringTask (void *pvParameters)
+{
+    for( ;; )                                                                       // Debemos tener un bucle infinito
+    {
+        uint32_t wateringTime = 10000;
+        xEventGroupWaitBits(waterFlag, WATERING_START, pdFALSE, pdFALSE, portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
+        xQueuePeek(waterQueue, &wateringTime, ( TickType_t )10);
+        GPIOPinWrite(GPIOA0_BASE, 0x10, 0x10);
+        osi_Sleep(( TickType_t )wateringTime);
+        GPIOPinWrite(GPIOA0_BASE, 0x10, 0);
+        xEventGroupClearBits(waterFlag,WATERING_START);
     }
 }
 
@@ -1606,6 +1393,15 @@ void main()
     //
     setupTemperatureSensor();
 
+
+    //
+    // Configure relay pin
+    //
+    MAP_PinTypeGPIO(RELAY_PIN, PIN_MODE_0, false);
+    MAP_GPIODirModeSet(GPIOA0_BASE, 0x10, GPIO_DIR_MODE_OUT);
+    GPIOPinWrite(GPIOA0_BASE, 0x10, 0);
+
+
     //
     // Start the SimpleLink Host
     //
@@ -1631,67 +1427,67 @@ void main()
     }
 
 
-
+    //
+    // Crear las colas
+    //
     freqQueue = xQueueCreate(1,sizeof(uint32_t));
     if (freqQueue==NULL)
     {
         while(1);
     }
 
-    configQueue = xQueueCreate(1,sizeof(systemConfig));
-    if (freqQueue==NULL)
+    thresholdsQueue = xQueueCreate(1,sizeof(systemThresholds));
+    if (thresholdsQueue==NULL)
+    {
+        while(1);
+    }
+
+    waterQueue = xQueueCreate(1,sizeof(uint32_t));
+    if (waterQueue==NULL)
     {
         while(1);
     }
 
     //
-    // Comenzar la tarea que gestiona cuando se debe reportar el valor de los aceleracion
+    // Crear los grupos de eventos
     //
-//    lRetVal = osi_TaskCreate(moistureTask,
-//                            (const signed char *)"Moisture Task",
-//                            OSI_STACK_SIZE, NULL, 2, NULL );
-//
-//    if(lRetVal < 0)
-//    {
-//       ERR_PRINT(lRetVal);
-//       LOOP_FOREVER();
-//    }
+    measurementFlag = xEventGroupCreate();
+    if( measurementFlag == NULL )
+    {
+            while(1);
+    }
+
+    waterFlag = xEventGroupCreate();
+    if( waterFlag == NULL )
+    {
+            while(1);
+    }
+
+
 
     //
-    // Comenzar la tarea que gestiona cuando se debe reportar el valor de los aceleracion
+    // Crear las tareas
     //
-//    lRetVal = osi_TaskCreate(waterLevelTask,
-//                                (const signed char *)"Water Level Task",
-//                                OSI_STACK_SIZE, NULL, 2, NULL );
-//
-//    if(lRetVal < 0)
-//    {
-//       ERR_PRINT(lRetVal);
-//       LOOP_FOREVER();
-//    }
+    lRetVal = osi_TaskCreate(measurementsTask,
+                                (const signed char *)"Measurements Task",
+                                OSI_STACK_SIZE, NULL, 2, NULL );
 
-    //
-    // Comenzar la tarea que gestiona cuando se debe reportar el valor de los aceleracion
-    //
-//    lRetVal = osi_TaskCreate(temperatureTask,
-//                                (const signed char *)"Temperature Task",
-//                                OSI_STACK_SIZE, NULL, 2, NULL );
-//
-//    if(lRetVal < 0)
-//    {
-//       ERR_PRINT(lRetVal);
-//       LOOP_FOREVER();
-//    }
+    if(lRetVal < 0)
+    {
+       ERR_PRINT(lRetVal);
+       LOOP_FOREVER();
+    }
 
-        lRetVal = osi_TaskCreate(measurementsTask,
-                                    (const signed char *)"Measurements Task",
-                                    OSI_STACK_SIZE, NULL, 2, NULL );
+    lRetVal = osi_TaskCreate(wateringTask,
+                                (const signed char *)"Watering Task",
+                                OSI_STACK_SIZE, NULL, 2, NULL );
 
-        if(lRetVal < 0)
-        {
-           ERR_PRINT(lRetVal);
-           LOOP_FOREVER();
-        }
+    if(lRetVal < 0)
+    {
+       ERR_PRINT(lRetVal);
+       LOOP_FOREVER();
+    }
+
 
 
     //

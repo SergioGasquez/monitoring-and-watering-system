@@ -1,5 +1,17 @@
 #ifndef __TEMPERATURE_SENSOR__
 #define __TEMPERATURE_SENSOR__
+
+/************************************************/
+/*                    PINOUT                    */
+/*
+ *    SHT31                   CC3200
+ *    ----------------------------------
+ *    VIN                       VCC
+ *    GND                       GND
+ *    SCL                       PIN_01
+ *    SDA                       PIN_02
+ */
+
 #include "i2c_if.h"
 #include "stdint.h"
 #include "FreeRTOSConfig.h"

@@ -1,6 +1,27 @@
 #ifndef __MOISTURE_SENSOR__
 #define __MOISTURE_SENSOR__
 
+
+/************************************************/
+/*                    PINOUT                    */
+/*
+ *    SEN0193                   CC3200
+ *    ----------------------------------
+ *    GND                       GND
+ *    VCC                       VCC
+ *    AOUT                      PIN_59
+ *
+ *                      CONFIG
+ *
+ *
+ *        AOUT ---R1---X PIN_59
+ *                     |
+ *                     R2       R1 = R2 = 470 kOhm
+ *                     |
+ *                    GND
+ */
+
+
 #include<stdint.h>
 #include "pin.h"
 #include "adc.h"

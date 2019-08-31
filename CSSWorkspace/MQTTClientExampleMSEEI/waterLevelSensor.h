@@ -1,6 +1,20 @@
 #ifndef __WATER_LEVEL_SENSOR__
 #define __WATER_LEVEL_SENSOR__
 
+/************************************************/
+/*                    PINOUT                    */
+/*
+ *    HC-SR04                   CC3200
+ *    ----------------------------------
+ *    GND                       GND
+ *    Echo                      PIN_08
+ *    Trigger                   PIN_64
+ *    VCC                       VCC
+ */
+
+
+
+
 #include<stdint.h>
 #include "pin.h"
 #include "gpio.h"
