@@ -177,6 +177,8 @@ void vUARTTask( void *pvParameters );
 int echowait = 0;
 volatile int pulse= 0;
 
+
+
 static QueueHandle_t freqQueue;             // Cola que almacena la frecuencia con la que se mide
 static QueueHandle_t thresholdsQueue;       // Cola que almacena los thresholds
 static QueueHandle_t waterQueue;            // Cola que almacena el tiempo que se riega
@@ -224,6 +226,7 @@ static void DisplayBanner(char * AppName);
 void ConnectWiFI(void *pvParameters);
 void measurementsTask(void *pvParameters);
 void wateringTask (void *pvParameters);
+void waterLevelTask (void *pvParameters);
 
 
 //*****************************************************************************
@@ -1341,6 +1344,14 @@ void wateringTask (void *pvParameters)
     }
 }
 
+void waterLevelTask(void *pvParameters)
+{
+    for( ;; )                                                                       // Debemos tener un bucle infinito
+    {
+        readWaterLevel();
+        osi_Sleep(5000);
+    }
+}
 
 
 //*****************************************************************************
@@ -1386,7 +1397,7 @@ void main()
     //
     // Configure the timers for the Water Level Sensor
     //
-//    setupWaterLevel();
+    setupWaterLevel();
 
     //
     // Configure the I2C for the Water Level Sensor
@@ -1487,6 +1498,16 @@ void main()
        ERR_PRINT(lRetVal);
        LOOP_FOREVER();
     }
+
+    lRetVal = osi_TaskCreate(waterLevelTask,
+                                    (const signed char *)"Water Level Task",
+                                    OSI_STACK_SIZE, NULL, 2, NULL );
+
+        if(lRetVal < 0)
+        {
+           ERR_PRINT(lRetVal);
+           LOOP_FOREVER();
+        }
 
 
 

@@ -2,6 +2,12 @@
 
 void setupWaterLevel()
 {
+    waterLevelMeasures = xEventGroupCreate();
+    if( waterLevelMeasures == NULL )
+    {
+            while(1);
+    }
+
     // Configure Timer
     MAP_TimerConfigure(TIMERA2_BASE, TIMER_CFG_PERIODIC_UP);
     MAP_TimerEnable(TIMERA2_BASE,TIMER_A);
@@ -9,6 +15,7 @@ void setupWaterLevel()
     // Configure Echo Pin
     MAP_GPIOIntEnable(GPIOA2_BASE,PIN_08);
     MAP_GPIOIntTypeSet(GPIOA2_BASE, PIN_08,GPIO_BOTH_EDGES);
+    IntPrioritySet(INT_GPIOA2, configMAX_SYSCALL_INTERRUPT_PRIORITY);
     MAP_TimerIntRegister(TIMERA2_BASE,TIMER_A,echoInt);
     MAP_GPIOIntRegister(GPIOA2_BASE,echoInt);
 
@@ -23,6 +30,8 @@ uint32_t readWaterLevel()
         MAP_GPIOPinWrite(GPIOA1_BASE, PIN_64,PIN_64);
         UtilsDelay(266);
         MAP_GPIOPinWrite(GPIOA1_BASE, PIN_64, ~PIN_64);
+
+        // Wait for a reading to finish
         while(echowait != 0);
         float percentage =0.0;
         int ad;
@@ -32,31 +41,111 @@ uint32_t readWaterLevel()
         percentage =(float)(pulse/total);
         percentage= percentage*100;
         ad=(int)percentage;
-        Report("distance = %2dcm \n\r" , pulse);
+        Report("DDdistance = %2dcm \n\r" , pulse);
         Report("distance = %2dcm \n\r" , ad);
         Report("Percentage = %f -/- \n\r" , percentage);
     }
-    UtilsDelay(8000000);
 }
-void inputInt()
+void echoInt()
 {
-  MAP_GPIOIntClear(GPIOA2_BASE,PIN_08);
-  if (GPIOPinRead(GPIOA2_BASE,PIN_08) == 2)
+  MAP_GPIOIntClear(GPIOA2_BASE,PIN_08);             // Clear the interruption
+  if (GPIOPinRead(GPIOA2_BASE,PIN_08) == 2)         // Rising edge
   {
-      HWREG(TIMERA2_BASE + TIMER_O_TAV ) = 0; //Loads value 0 into the timer.
-      long ad = MAP_TimerLoadGet(TIMERA2_BASE,TIMER_A);
-      TimerEnable(TIMERA2_BASE,TIMER_A);
+      HWREG(TIMERA2_BASE + TIMER_O_TAV ) = 0;       //Loads value 0 into the timer.
+//      long ad = MAP_TimerLoadGet(TIMERA2_BASE,TIMER_A);
+      TimerEnable(TIMERA2_BASE,TIMER_A);            // Enables the timer
       echowait=1;
   }
-  else
+  else                                              // Falling Edge
   {
-    pulse = TimerValueGet(TIMERA2_BASE,TIMER_A);
+    pulse = TimerValueGet(TIMERA2_BASE,TIMER_A);    // Gets the timer vuale
     long af = GPIOPinRead(GPIOA2_BASE,PIN_08);
-    TimerDisable(TIMERA2_BASE,TIMER_A);
-    echowait=0;
+    TimerDisable(TIMERA2_BASE,TIMER_A);             // Disables the timer
+    echowait=0;                                     // Changes the value of echowait in order to continue in the code
   }
 }
 #endif // DEFAULT_CODE
+
+
+
+
+
+#ifdef CODE_3
+uint32_t readWaterLevel()
+{
+    const double temp = 1.0/80.0; // 80 MHZ ?
+    if(waterLevelMeasures != WAITING_ECHO)
+    {
+        //Does the required pulse of 10uS
+        MAP_GPIOPinWrite(GPIOA1_BASE, PIN_64,PIN_64);
+        UtilsDelay(266);
+        MAP_GPIOPinWrite(GPIOA1_BASE, PIN_64, ~PIN_64);
+
+        // Wait for a reading to finish
+//        while(echowait != 0);
+        xEventGroupWaitBits(waterLevelMeasures, WAITING_ECHO, pdFALSE, pdFALSE, portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
+
+        float percentage =0.0;
+        int ad;
+        float total =40.0;
+        pulse =(uint32_t)(temp * pulse);
+        pulse = pulse / 58;
+        percentage =(float)(pulse/total);
+        percentage= percentage*100;
+        ad=(int)percentage;
+        Report("DDdistance = %2dcm \n\r" , pulse);
+        Report("distance = %2dcm \n\r" , ad);
+        Report("Percentage = %f -/- \n\r" , percentage);
+        xEventGroupClearBits(waterLevelMeasures, WAITING_ECHO);
+
+    }
+}
+void echoInt()
+{
+    BaseType_t xHigherPriorityTaskWoken=pdFALSE;
+    UtilsDelay(8000);
+    MAP_GPIOIntClear(GPIOA2_BASE,PIN_08);             // Clear the interruption
+    if (GPIOPinRead(GPIOA2_BASE,PIN_08) == 2)         // Rising edge
+    {
+        HWREG(TIMERA2_BASE + TIMER_O_TAV ) = 0;       //Loads value 0 into the timer.
+//        long ad = MAP_TimerLoadGet(TIMERA2_BASE,TIMER_A);
+        TimerEnable(TIMERA2_BASE,TIMER_A);            // Enables the timer
+        pulse = TimerValueGet(TIMERA2_BASE,TIMER_A);    // Gets the timer vuale
+
+//        echowait=1;
+        xEventGroupClearBitsFromISR(waterLevelMeasures, WAITING_ECHO); // Ya no esperamos un echo
+    }
+    else                                              // Falling Edge
+    {
+        pulse = TimerValueGet(TIMERA2_BASE,TIMER_A);    // Gets the timer vuale
+        long af = GPIOPinRead(GPIOA2_BASE,PIN_08);
+        TimerDisable(TIMERA2_BASE,TIMER_A);             // Disables the timer
+//        echowait=0;                                     // Changes the value of echowait in order to continue in the code
+        xEventGroupSetBitsFromISR(waterLevelMeasures, WAITING_ECHO, &xHigherPriorityTaskWoken);
+
+    }
+    portYIELD_FROM_ISR( xHigherPriorityTaskWoken );         // Miramos si hay otra tarea de mayor prioridad
+}
+#endif // CODE_3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #ifdef CODE_1
 uint32_t readWaterLevel()
@@ -115,6 +204,7 @@ void echoInt()
         long ad = MAP_TimerLoadGet(TIMERA2_BASE,TIMER_A);           // Gets the timer load value. Debe ser 0?
         TimerEnable(TIMERA2_BASE,TIMER_A);                          // Activa el timer
         echowait=1;                                                 // Esperamos un echo
+
     }
     //    If it's a falling edge that was detected, then get the value of the counter
     else
@@ -172,33 +262,35 @@ uint32_t readWaterLevel()
 
 void echoInt()
 {
-    //Clear interrupt flag. Since we only enabled on this is enough
-    MAP_GPIOIntClear(GPIOA2_BASE,PIN_08);
+    BaseType_t xHigherPriorityTaskWoken=pdFALSE;
+//    UtilsDelay(8000);           // Debouncer
+//    //Clear interrupt flag. Since we only enabled on this is enough
+//    MAP_GPIOIntClear(GPIOA2_BASE,PIN_08);
+//
+//
+//   // If it's a rising edge then set he timer to 0
+//    //It's in periodic mode so it was in some random value
+//
+//    if (GPIOPinRead(GPIOA2_BASE,PIN_08) == 2)          // If risign edge
+//    {
+//        HWREG(TIMERA2_BASE + TIMER_O_TAV ) = 0; //Loads value 0 into the timer.
+//
+//        long ad = MAP_TimerLoadGet(TIMERA2_BASE,TIMER_A);           // Gets the timer load value. Debe ser 0?
+//        TimerEnable(TIMERA2_BASE,TIMER_A);                          // Activa el timer
+//        xEventGroupSetBitsFromISR(waterLevelMeasures, WAITING_ECHO, &xHigherPriorityTaskWoken); // Esperamos un echo
+//    }
+//    //    If it's a falling edge that was detected, then get the value of the counter
+//    else
+//    {
+//        pulse = TimerValueGet(TIMERA2_BASE,TIMER_A);            // Gets the current timer value.
+//        long af = GPIOPinRead(GPIOA2_BASE,PIN_08);              // Lee el pin
+//        //Report("pin = %dcm \n\r" , af);
+//        // Report("distance = %dcm \n\r" , pulse);//record value
+//        TimerDisable(TIMERA2_BASE,TIMER_A);                     // Desactiva el timer
+//        xEventGroupClearBitsFromISR(waterLevelMeasures, WAITING_ECHO); // Ya no esperamos un echo
+//    }
+    portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 
-
-   // If it's a rising edge then set he timer to 0
-    //It's in periodic mode so it was in some random value
-
-    if (GPIOPinRead(GPIOA2_BASE,PIN_08) == 2)          // If risign edge
-    {
-        HWREG(TIMERA2_BASE + TIMER_O_TAV ) = 0; //Loads value 0 into the timer.
-
-        long ad = MAP_TimerLoadGet(TIMERA2_BASE,TIMER_A);           // Gets the timer load value. Debe ser 0?
-        TimerEnable(TIMERA2_BASE,TIMER_A);                          // Activa el timer
-        xEventGroupSetBitsFromISR(waterLevelMeasures, WAITING_ECHO, ( ( BaseType_t ) 0 )); // Esperamos un echo
-//        xEventGroupSetBits(waterLevelMeasures, WAITING_ECHO);
-    }
-    //    If it's a falling edge that was detected, then get the value of the counter
-    else
-    {
-        pulse = TimerValueGet(TIMERA2_BASE,TIMER_A);            // Gets the current timer value.
-        long af = GPIOPinRead(GPIOA2_BASE,PIN_08);              // Lee el pin
-        //Report("pin = %dcm \n\r" , af);
-        // Report("distance = %dcm \n\r" , pulse);//record value
-        TimerDisable(TIMERA2_BASE,TIMER_A);                     // Desactiva el timer
-        xEventGroupClearBitsFromISR(waterLevelMeasures, WAITING_ECHO); // Ya no esperamos un echo
-//        xEventGroupClearBits(waterLevelMeasures, WAITING_ECHO);
-    }
 }
 
 #endif // CODE_2

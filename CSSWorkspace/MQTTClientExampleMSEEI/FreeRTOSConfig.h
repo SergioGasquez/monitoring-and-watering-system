@@ -159,9 +159,9 @@ to exclude the API function. */
 #define INCLUDE_eTaskGetState                   1
 #define INCLUDE_xSemaphoreGetMutexHolder        0
 #define INCLUDE_xTaskGetCurrentTaskHandle       1
-#define INCLUDE_xTimerPendFunctionCall      1
+#define INCLUDE_xTimerPendFunctionCall          1
 #define INCLUDE_xEventGroupSetBitFromISR        1           // [SGA]: Para el grupo de eventos
-#define INCLUDE_xTimerPendFunctionCall      1
+#define INCLUDE_xTimerPendFunctionCall          1
 
 #define configKERNEL_INTERRUPT_PRIORITY 		( 7 << 5 )	/* Priority 7, or 255 as only the top three bits are implemented.  This is the lowest priority. */
 /* !!!! configMAX_SYSCALL_INTERRUPT_PRIORITY must not be set to zero !!!!
