@@ -69,6 +69,7 @@ public:
     QwtTextLabel *secondsLabel;
     QwtTextLabel *tempUnitsLabel;
     QwtTextLabel *moistUnitsLabel;
+    QwtTextLabel *warningLabel;
     QSlider *measurmentSwitch;
     QwtTextLabel *startLabel;
     QwtTextLabel *onLabel;
@@ -213,7 +214,7 @@ public:
         waterButton->setFont(font);
         waterParamsSet = new QPushButton(waterTab);
         waterParamsSet->setObjectName(QStringLiteral("waterParamsSet"));
-        waterParamsSet->setGeometry(QRect(620, 320, 171, 71));
+        waterParamsSet->setGeometry(QRect(630, 310, 171, 71));
         waterParamsSet->setFont(font);
         waterTimeLabel = new QwtTextLabel(waterTab);
         waterTimeLabel->setObjectName(QStringLiteral("waterTimeLabel"));
@@ -265,6 +266,13 @@ public:
         moistUnitsLabel = new QwtTextLabel(waterTab);
         moistUnitsLabel->setObjectName(QStringLiteral("moistUnitsLabel"));
         moistUnitsLabel->setGeometry(QRect(500, 260, 31, 20));
+        warningLabel = new QwtTextLabel(waterTab);
+        warningLabel->setObjectName(QStringLiteral("warningLabel"));
+        warningLabel->setGeometry(QRect(70, 440, 831, 71));
+        QFont font6;
+        font6.setPointSize(9);
+        warningLabel->setFont(font6);
+        warningLabel->setLineWidth(1);
         tabWidget->addTab(waterTab, QString());
         measurmentSwitch = new QSlider(GUIPanel);
         measurmentSwitch->setObjectName(QStringLiteral("measurmentSwitch"));
@@ -278,17 +286,17 @@ public:
         onLabel = new QwtTextLabel(GUIPanel);
         onLabel->setObjectName(QStringLiteral("onLabel"));
         onLabel->setGeometry(QRect(810, 40, 51, 20));
-        QFont font6;
-        font6.setPointSize(10);
-        onLabel->setFont(font6);
+        QFont font7;
+        font7.setPointSize(10);
+        onLabel->setFont(font7);
         offLabel = new QwtTextLabel(GUIPanel);
         offLabel->setObjectName(QStringLiteral("offLabel"));
         offLabel->setGeometry(QRect(760, 40, 51, 20));
-        offLabel->setFont(font6);
+        offLabel->setFont(font7);
 
         retranslateUi(GUIPanel);
 
-        tabWidget->setCurrentIndex(0);
+        tabWidget->setCurrentIndex(3);
 
 
         QMetaObject::connectSlotsByName(GUIPanel);
@@ -350,6 +358,7 @@ public:
         secondsLabel->setPlainText(QApplication::translate("GUIPanel", "Seconds", Q_NULLPTR));
         tempUnitsLabel->setPlainText(QApplication::translate("GUIPanel", "\302\272C", Q_NULLPTR));
         moistUnitsLabel->setPlainText(QApplication::translate("GUIPanel", "%", Q_NULLPTR));
+        warningLabel->setPlainText(QApplication::translate("GUIPanel", "WARNING: The watering will be activated if the temperature raises above the threshold and the moisture is under the threshold.", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(waterTab), QApplication::translate("GUIPanel", "Watering", Q_NULLPTR));
         startLabel->setPlainText(QApplication::translate("GUIPanel", "Measurements: ", Q_NULLPTR));
         onLabel->setPlainText(QApplication::translate("GUIPanel", "On", Q_NULLPTR));

@@ -111,7 +111,6 @@ void echoInt()
 //        long ad = MAP_TimerLoadGet(TIMERA2_BASE,TIMER_A);
         TimerEnable(TIMERA2_BASE,TIMER_A);            // Enables the timer
         pulse = TimerValueGet(TIMERA2_BASE,TIMER_A);    // Gets the timer vuale
-
 //        echowait=1;
         xEventGroupClearBitsFromISR(waterLevelMeasures, WAITING_ECHO); // Ya no esperamos un echo
     }

@@ -43,8 +43,7 @@ extern volatile int pulse;
 //#define CODE_1        // El de la web cambiado un poco, cambio de tiempos y conversiones
 //#define CODE_2          // El de la web sin codigo bloqueante
 #define CODE_3
-//#define ECHO_PIN PIN_08
-//#define TRIGGER_PIN PIN_64
+
 
 #ifdef __cplusplus
 extern "C"

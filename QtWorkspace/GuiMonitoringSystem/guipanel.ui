@@ -131,7 +131,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>3</number>
    </property>
    <widget class="QWidget" name="generalTab">
     <attribute name="title">
@@ -510,8 +510,8 @@
     <widget class="QPushButton" name="waterParamsSet">
      <property name="geometry">
       <rect>
-       <x>620</x>
-       <y>320</y>
+       <x>630</x>
+       <y>310</y>
        <width>171</width>
        <height>71</height>
       </rect>
@@ -704,6 +704,27 @@
      </property>
      <property name="plainText">
       <string>%</string>
+     </property>
+    </widget>
+    <widget class="QwtTextLabel" name="warningLabel">
+     <property name="geometry">
+      <rect>
+       <x>70</x>
+       <y>440</y>
+       <width>831</width>
+       <height>71</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>9</pointsize>
+      </font>
+     </property>
+     <property name="lineWidth">
+      <number>1</number>
+     </property>
+     <property name="plainText">
+      <string>WARNING: The watering will be activated if the temperature raises above the threshold and the moisture is under the threshold.</string>
      </property>
     </widget>
    </widget>

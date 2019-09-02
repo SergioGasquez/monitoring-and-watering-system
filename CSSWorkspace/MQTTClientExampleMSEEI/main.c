@@ -1266,7 +1266,7 @@ void ConnectWiFI(void *pvParameters)
             getTemperature(&sensorsData_.sht31Data_.temperature, &sensorsData_.sht31Data_.humidity);
             analogReadMoisture(&sensorsData_.moisture_);
             xQueuePeek(thresholdsQueue, &systemThresholds_, ( TickType_t )10);
-            if(systemThresholds_.temperature >= sensorsData_.sht31Data_.temperature && systemThresholds_.moisture >= &sensorsData_.moisture_)
+            if((float)(systemThresholds_.temperature) <= sensorsData_.sht31Data_.temperature && (float)systemThresholds_.moisture >= sensorsData_.moisture_)
             {
                 xEventGroupSetBits(waterFlag,WATERING_START);
             }
@@ -1348,7 +1348,9 @@ void waterLevelTask(void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-        readWaterLevel();
+//        readWaterLevel();
+        float moist;
+        analogReadMoisture(&moist);
         osi_Sleep(5000);
     }
 }

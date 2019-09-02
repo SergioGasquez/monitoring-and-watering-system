@@ -14,7 +14,7 @@
  *                      CONFIG
  *
  *
- *        AOUT ---R1---X PIN_59
+ *        AOUT ---R1---X PIN_58
  *                     |
  *                     R2       R1 = R2 = 470 kOhm
  *                     |
@@ -35,7 +35,8 @@
 #define FAILURE                 -1
 #define SUCCESS                 0
 
-#define MOISTURE_SENSOR_PIN PIN_59
+//#define MOISTURE_SENSOR_PIN PIN_59
+#define MOISTURE_SENSOR_PIN PIN_58
 
 #ifdef __cplusplus
 extern "C"

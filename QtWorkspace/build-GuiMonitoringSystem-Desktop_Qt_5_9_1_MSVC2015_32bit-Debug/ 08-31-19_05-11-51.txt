@@ -1,3 +1,0 @@
-temperature, humidity, moisture 
-
-29.718475, 60.181583, 43.106426
