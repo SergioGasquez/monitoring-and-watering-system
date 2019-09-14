@@ -26,7 +26,7 @@ constexpr const char * TOPIC_CC3200                 = "/cc3200/#"; // Topic en e
 
 /*
 // Subtopics (no se usan porque se subscribe solo al topic superior)
-constexpr const char * TOPIC_SENSORS                    = "/cc3200/SENSORS";
+constexpr const char * TOPIC_SENSORS                    = "/cc3200/Station1";
 constexpr const char * TOPIC_PING                   = "/cc3200/PING";
 */
 
