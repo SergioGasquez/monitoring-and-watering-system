@@ -28,15 +28,13 @@
 #include "hw_memmap.h"
 #include "hw_types.h"
 #include "uart_if.h"
+#include "gpio.h"
 
-//#define AVERAGE
-#define SINGLE_MEASURE
 
 #define FAILURE                 -1
 #define SUCCESS                 0
 
-//#define MOISTURE_SENSOR_PIN PIN_59
-#define MOISTURE_SENSOR_PIN PIN_58
+#define MOISTURE_SENSOR_PIN     PIN_58
 
 #ifdef __cplusplus
 extern "C"

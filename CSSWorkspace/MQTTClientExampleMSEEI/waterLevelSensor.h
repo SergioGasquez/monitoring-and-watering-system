@@ -35,6 +35,7 @@
 
 static  EventGroupHandle_t waterLevelMeasures;
 #define WAITING_ECHO          0x0001
+#define ECHO_DONE             0x0002
 
 extern int echowait ;
 extern volatile int pulse;
@@ -42,7 +43,8 @@ extern volatile int pulse;
 //#define DEFAULT_CODE // El de la web
 //#define CODE_1        // El de la web cambiado un poco, cambio de tiempos y conversiones
 //#define CODE_2          // El de la web sin codigo bloqueante
-#define CODE_3
+//#define CODE_3
+#define CODE_4
 
 
 #ifdef __cplusplus

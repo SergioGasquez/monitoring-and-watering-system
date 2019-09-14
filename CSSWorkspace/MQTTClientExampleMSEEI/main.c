@@ -121,7 +121,7 @@
 #define RETAIN                  1
 
 /*Topics a los que va a publicar*/
-#define PUB_TOPIC_SENSORS  "/cc3200/Sensors"
+#define PUB_TOPIC_SENSORS  "/cc3200/Station1"
 
 /*Numero de topics a los que se va a subscribir*/
 #define TOPIC_COUNT             1
@@ -1348,10 +1348,11 @@ void waterLevelTask(void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
+        osi_Sleep(10000);
 //        readWaterLevel();
         float moist;
         analogReadMoisture(&moist);
-        osi_Sleep(5000);
+        osi_Sleep(2000);
     }
 }
 

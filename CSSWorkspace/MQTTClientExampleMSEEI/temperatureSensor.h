@@ -48,24 +48,12 @@
 #define RET_IF_ERR(Func)        {int iRetVal = (Func); \
                                  if (SUCCESS != iRetVal) \
                                      return  iRetVal;}
-/*
-typedef enum SHT3xMode
-{
-    Single_HighRep_ClockStretch,
-    Single_MediumRep_ClockStretch,
-    Single_LowRep_ClockStretch,
-    Single_HighRep_NoClockStretch,
-    Single_MediumRep_NoClockStretch,
-    Single_LowRep_NoClockStretch
-}SHT3xModes;
-*/
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-//void setMode(SHT3xMode mode);
 void setupTemperatureSensor();
 int getTemperature(float *temperature, float *humidity);
 bool crcCheck(unsigned char MSB, unsigned char LSB, unsigned char CRC);

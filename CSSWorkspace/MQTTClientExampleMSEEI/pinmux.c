@@ -96,7 +96,12 @@ PinMuxConfig(void)
     //
     // Configure PIN_59 for Moisture Sensor
     //
-    MAP_PinTypeGPIO(PIN_59, PIN_MODE_0, false);
-    MAP_GPIODirModeSet(GPIOA0_BASE, 0x10, GPIO_DIR_MODE_IN);
+//    MAP_PinTypeGPIO(PIN_59, PIN_MODE_0, false);
+//    MAP_GPIODirModeSet(GPIOA0_BASE, 0x10, GPIO_DIR_MODE_IN);
 
+    //
+    // Configure PIN_58 for Moisture Sensor
+    //
+    MAP_PinTypeGPIO(PIN_58, PIN_MODE_0, false);
+    MAP_GPIODirModeSet(GPIOA0_BASE, 0x08, GPIO_DIR_MODE_IN);
 }
