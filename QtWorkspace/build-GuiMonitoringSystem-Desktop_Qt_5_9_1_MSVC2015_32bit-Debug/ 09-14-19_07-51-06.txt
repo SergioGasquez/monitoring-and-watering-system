@@ -1,0 +1,3 @@
+temperature, humidity, moisture 
+
+26.682312, 57.639431, 55.999981

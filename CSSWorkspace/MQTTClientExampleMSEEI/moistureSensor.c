@@ -31,7 +31,7 @@ int analogReadMoisture(float *moisture)
     }
     else
     {
-        Report("\n moisture voltage = %f  \n" , *moisture);
+//        Report("\n moisture voltage = %f  \n" , *moisture);
         *moisture =  (*moisture*100)/1.4;
         return SUCCESS;
     }

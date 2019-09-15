@@ -9,7 +9,7 @@
  *    ----------------------------------
  *    GND                       GND
  *    VCC                       VCC
- *    AOUT                      PIN_59
+ *    AOUT                      PIN_58
  *
  *                      CONFIG
  *
