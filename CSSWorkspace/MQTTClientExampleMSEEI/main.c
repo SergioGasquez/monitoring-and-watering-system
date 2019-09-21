@@ -89,6 +89,9 @@
 
 #define APPLICATION_VERSION     "1.1.1"
 
+
+#define DEBUG
+
 /*Operate Lib in MQTT 3.1 mode.*/
 #define MQTT_3_1_1              false /*MQTT 3.1.1 */
 #define MQTT_3_1                true /*MQTT 3.1*/
@@ -99,7 +102,7 @@
 #define WILL_RETAIN             false
 
 /*Defining Broker IP address and port Number*/
-#define SERVER_ADDRESS          "192.168.1.38"      // IP del PC        //"192.168.1.2" <-- Si se usa modo AP
+#define SERVER_ADDRESS          "192.168.1.38"      // IP del PC (Broker MQTT)
 #define PORT_NUMBER             1883
 
 #define MAX_BROKER_CONN         1
@@ -122,14 +125,15 @@
 
 /*Topics a los que va a publicar*/
 #define PUB_TOPIC_SENSORS  "/cc3200/Station1"
+#define PUB_TOPIC_LOSANT    "losant/5d8236ee68f6a70006d4a026/state"
 
 /*Numero de topics a los que se va a subscribir*/
-#define TOPIC_COUNT             1
+#define TOPIC_COUNT             2
 
 /*Defining Subscription Topic Values*/
 #define TOPIC_PC                "/PC"
-//#define TOPIC1                  "/cc3200/SENSORS"
-//#define TOPIC_PING              "/cc3200/PING"
+#define TOPIC_LOSANT            "losant/5d8236ee68f6a70006d4a026/command"
+
 
 #define RELAY_PIN PIN_59
 
@@ -176,17 +180,18 @@ void vUARTTask( void *pvParameters );
 
 int echowait = 0;
 volatile int pulse= 0;
-
-
+volatile unsigned long timerValue = 0;
+ volatile unsigned long timerValue1;
+ volatile unsigned long timerValue2;
 
 static QueueHandle_t freqQueue;             // Cola que almacena la frecuencia con la que se mide
 static QueueHandle_t thresholdsQueue;       // Cola que almacena los thresholds
 static QueueHandle_t waterQueue;            // Cola que almacena el tiempo que se riega
 
-static EventGroupHandle_t measurementFlag;
+static EventGroupHandle_t measurementFlag;  // Grupo de eventos que controla cuando se debe medir
 #define MEASUREMENT_START 0x0001
 
-static EventGroupHandle_t waterFlag;
+static EventGroupHandle_t waterFlag;        // Grupo de eventos que controla cuando se debe regar
 #define WATERING_START 0x0001
 
 
@@ -226,7 +231,6 @@ static void DisplayBanner(char * AppName);
 void ConnectWiFI(void *pvParameters);
 void measurementsTask(void *pvParameters);
 void wateringTask (void *pvParameters);
-void waterLevelTask (void *pvParameters);
 
 
 //*****************************************************************************
@@ -273,7 +277,7 @@ connect_config usr_connect_config[] =
         KEEP_ALIVE_TIMER,
         {Mqtt_Recv, sl_MqttEvt, sl_MqttDisconnect},
         TOPIC_COUNT,
-        {TOPIC_PC},             // Nos subscribimos al topic del PC
+        {TOPIC_PC,TOPIC_LOSANT},             // Nos subscribimos al topic del PC
         {QOS2},                 // Con calidad de servicio 2
         {WILL_TOPIC,WILL_MSG,WILL_QOS,WILL_RETAIN},
         false
@@ -291,6 +295,8 @@ SlMqttClientLibCfg_t Mqtt_Client={
 
 /*Conversion a char* de los topics en los que publicaremos*/
 const char *pub_topic_sensors = PUB_TOPIC_SENSORS;
+const char *pub_topic_losant = PUB_TOPIC_LOSANT;
+
 
 
 
@@ -328,17 +334,16 @@ Mqtt_Recv(void *app_hndl, const char  *topstr, long top_len, const void *payload
     memset(output_str,'\0',top_len+1);
     strncpy(output_str, (char*)topstr, top_len);
     output_str[top_len]='\0';
-    if (strncmp(output_str,TOPIC_PC, top_len) == 0)
+    if (strncmp(output_str,TOPIC_PC, top_len) == 0)                         // Si recibimos un mensaje de la interfaz de PC
     {
         systemThresholds systemThresholds_;
         uint32_t value;
-        bool boolean;
-        if (json_scanf((const char *)payload, pay_len, "{ measuresFreq: %d }", &value)>0)         // Si recibimos un mensaje de cambio de modo
+        if (json_scanf((const char *)payload, pay_len, "{ measuresFreq: %d }", &value)>0)         // Si recibimos un mensaje de cambio de frecuencia de muestreo
         {
             value = value*1000*60;
             xQueueOverwrite(freqQueue,&value);
         }
-        if (json_scanf((const char *)payload, pay_len, "{ measurementSwitch: %d }", &value)>0)         // Si recibimos un mensaje de cambio de modo
+        if (json_scanf((const char *)payload, pay_len, "{ measurementSwitch: %d }", &value)>0)         // Si recibimos un mensaje de pausar/reunadar las medidas
         {
             if(value)
             {
@@ -349,26 +354,75 @@ Mqtt_Recv(void *app_hndl, const char  *topstr, long top_len, const void *payload
                 xEventGroupClearBits(measurementFlag, MEASUREMENT_START);
             }
         }
-        if (json_scanf((const char *)payload, pay_len, "{ wateringTime: %d }", &value)>0)         // Si recibimos un mensaje de cambio de modo
+        if (json_scanf((const char *)payload, pay_len, "{ wateringTime: %d }", &value)>0)         // Si recibimos un mensaje de cambio de tiempo de riego
         {
-            // TODO: ANYTRANSFORMATION IF NEEDED
             value = value *1000;
             xQueueOverwrite(waterQueue,&value);
             xEventGroupSetBits(waterFlag,WATERING_START);
         }
-        if (json_scanf((const char *)payload, pay_len, "{ temperatureThreshold: %d }", &value)>0)         // Si recibimos un mensaje de cambio de modo
+        if (json_scanf((const char *)payload, pay_len, "{ temperatureThreshold: %d }", &value)>0)         // Si recibimos un mensaje de cambio de umbral de temperatura
         {
             systemThresholds_.temperature = value;
-            xQueueOverwrite(thresholdsQueue,&systemThresholds_); // TODO: COMPROBAR QUE SOLO REEMPLAZA ESTE VALOR
+            xQueueOverwrite(thresholdsQueue,&systemThresholds_);
         }
-        if (json_scanf((const char *)payload, pay_len, "{ moistureThreshold: %d }", &value)>0)         // Si recibimos un mensaje de cambio de modo
+        if (json_scanf((const char *)payload, pay_len, "{ moistureThreshold: %d }", &value)>0)         // Si recibimos un mensaje de cambio de umbral de humedad en suelo
         {
             systemThresholds_.moisture = value;
-            xQueueOverwrite(thresholdsQueue,&systemThresholds_);    // TODO: COMPROBAR QUE SOLO REEMPLAZA ESTE VALOR
+            xQueueOverwrite(thresholdsQueue,&systemThresholds_);
         }
 
 
     }
+    if (strncmp(output_str,TOPIC_LOSANT, top_len) == 0)                                     // Si recibimos un mensaje de Losant - Realizamos las mismas comprobaciones
+    {
+        systemThresholds systemThresholds_;
+        uint32_t value;
+        uint32_t freq;
+        bool boolean;
+        char *aux = NULL;
+        if (json_scanf((const char *)payload, pay_len, "{ payload: %Q }", &aux)>0)
+        {
+            if (json_scanf((const char *)aux, pay_len, "{ measurementSwitch: %B }", &boolean)>0)
+            {
+                if(boolean)
+                {
+                    xEventGroupSetBits(measurementFlag, MEASUREMENT_START);
+                }
+                else
+                {
+                    xEventGroupClearBits(measurementFlag, MEASUREMENT_START);
+                }
+            }
+            if (json_scanf((const char *)aux, pay_len, "{ measuresFreq: %d }", &freq)>0)
+            {
+                freq = freq*1000*60;
+                xQueueOverwrite(freqQueue,&freq);
+            }
+            if (json_scanf((const char *)aux, pay_len, "{ wateringTime: %d }", &value)>0)
+            {
+                value = value *1000;
+                xQueueOverwrite(waterQueue,&value);
+                xEventGroupSetBits(waterFlag,WATERING_START);
+            }
+            if (json_scanf((const char *)aux, pay_len, "{ temperatureThreshold: %d }", &value)>0)
+            {
+                systemThresholds_.temperature = value;
+                xQueueOverwrite(thresholdsQueue,&systemThresholds_);
+            }
+            if (json_scanf((const char *)aux, pay_len, "{ moistureThreshold: %d }", &value)>0)
+            {
+                systemThresholds_.moisture = value;
+                xQueueOverwrite(thresholdsQueue,&systemThresholds_);
+            }
+        }
+#ifdef DEBUG
+        UART_PRINT("\measurementSwitch: %d", (int)boolean);
+        UART_PRINT("\nmeasuresFreq: %d", freq);
+        UART_PRINT("\nsystemThresholds temeperature: %d", systemThresholds_.temperature);
+        UART_PRINT("\nsystemThresholds moisture: %d", systemThresholds_.moisture);
+#endif //DEBUG
+    }
+
     // Publicamos por la consola el mensaje publicado
     UART_PRINT("\n\rPublish Message Received");
     UART_PRINT("\n\rTopic: ");
@@ -663,277 +717,6 @@ char json_buffer[100];
 //struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
 
 
-#ifndef STATION_MODE
-//MQTT Task (Para el caso en el que no estoy en modo "STATION"
-#ifdef __cplusplus
-extern "C" {
-void MqttClientTask(void *pvParameters);
-}
-#endif /* __cplusplus */
-
-void MqttClientTask(void *pvParameters)
-{
-    long lRetVal = -1;
-    int iCount = 0;
-        int iNumBroker = 0;
-        int iConnBroker = 0;
-        osi_messages RecvQue;
-
-        connect_config *local_con_conf = (connect_config *)app_hndl;
-
-        //
-        // Initialze MQTT client lib
-        //
-        lRetVal = sl_ExtLib_MqttClientInit(&Mqtt_Client);
-        if(lRetVal != 0)
-        {
-            // lib initialization failed
-            UART_PRINT("MQTT Client lib initialization failed\n\r");
-            LOOP_FOREVER();
-        }
-
-        /******************* connection to the broker ***************************/
-        iNumBroker = sizeof(usr_connect_config)/sizeof(connect_config);
-        if(iNumBroker > MAX_BROKER_CONN)
-        {
-            UART_PRINT("Num of brokers are more then max num of brokers\n\r");
-            LOOP_FOREVER();
-        }
-
-        while(iCount < iNumBroker)
-        {
-            //create client context
-            local_con_conf[iCount].clt_ctx =
-            sl_ExtLib_MqttClientCtxCreate(&local_con_conf[iCount].broker_config,
-                                          &local_con_conf[iCount].CallBAcks,
-                                          &(local_con_conf[iCount]));
-
-            //
-            // Set Client ID
-            //
-            sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
-                                SL_MQTT_PARAM_CLIENT_ID,
-                                local_con_conf[iCount].client_id,
-                                strlen((char*)(local_con_conf[iCount].client_id)));
-
-            //
-            // Set will Params
-            //
-            if(local_con_conf[iCount].will_params.will_topic != NULL)
-            {
-                sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
-                                        SL_MQTT_PARAM_WILL_PARAM,
-                                        &(local_con_conf[iCount].will_params),
-                                        sizeof(SlMqttWill_t));
-            }
-
-            //
-            // setting username and password
-            //
-            if(local_con_conf[iCount].usr_name != NULL)
-            {
-                sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
-                                    SL_MQTT_PARAM_USER_NAME,
-                                    local_con_conf[iCount].usr_name,
-                                    strlen((char*)local_con_conf[iCount].usr_name));
-
-                if(local_con_conf[iCount].usr_pwd != NULL)
-                {
-                    sl_ExtLib_MqttClientSet((void*)local_con_conf[iCount].clt_ctx,
-                                    SL_MQTT_PARAM_PASS_WORD,
-                                    local_con_conf[iCount].usr_pwd,
-                                    strlen((char*)local_con_conf[iCount].usr_pwd));
-                }
-            }
-
-            //
-            // connectin to the broker
-            //
-            if((sl_ExtLib_MqttClientConnect((void*)local_con_conf[iCount].clt_ctx,
-                                local_con_conf[iCount].is_clean,
-                                local_con_conf[iCount].keep_alive_time) & 0xFF) != 0)
-            {
-                UART_PRINT("\n\rBroker connect fail for conn no. %d \n\r",iCount+1);
-
-                //delete the context for this connection
-                sl_ExtLib_MqttClientCtxDelete(local_con_conf[iCount].clt_ctx);
-
-                break;
-            }
-            else
-            {
-                UART_PRINT("\n\rSuccess: conn to Broker no. %d\n\r ", iCount+1);
-                local_con_conf[iCount].is_connected = true;
-                iConnBroker++;
-            }
-
-            //
-            // Subscribe to topics
-            //
-
-            if(sl_ExtLib_MqttClientSub((void*)local_con_conf[iCount].clt_ctx,
-                                       local_con_conf[iCount].topic,
-                                       local_con_conf[iCount].qos, TOPIC_COUNT) < 0)
-            {
-                UART_PRINT("\n\r Subscription Error for conn no. %d\n\r", iCount+1);
-                UART_PRINT("Disconnecting from the broker\r\n");
-                sl_ExtLib_MqttClientDisconnect(local_con_conf[iCount].clt_ctx);
-                local_con_conf[iCount].is_connected = false;
-
-                //delete the context for this connection
-                sl_ExtLib_MqttClientCtxDelete(local_con_conf[iCount].clt_ctx);
-                iConnBroker--;
-                break;
-            }
-            else
-            {
-                int iSub;
-                UART_PRINT("Client subscribed on following topics:\n\r");
-                for(iSub = 0; iSub < local_con_conf[iCount].num_topics; iSub++)
-                {
-                    UART_PRINT("%s\n\r", local_con_conf[iCount].topic[iSub]);
-                }
-            }
-            iCount++;
-        }
-
-        if(iConnBroker < 1)
-        {
-            //
-            // no succesful connection to broker
-            //
-            goto end;
-        }
-
-        iCount = 0;
-
-        for(;;)
-        {
-            osi_MsgQRead( &g_PBQueue, &RecvQue, OSI_WAIT_FOREVER);                  // Funcion bloqueante que espera a que haya algun mensaje en la cola de salida
-            // Cuando llega algun mensaje lo guardamos en RecvQue
-            // Comrpobamosque tipo de mensaje es
-            if(PUSH_BUTTON_SW2_PRESSED == RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
-            {
-
-                //
-                // send publish message
-                //
-                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                         pub_topic_sw2,data_sw2,strlen((char*)data_sw2),QOS2,RETAIN);
-
-                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));//Reinicio out1, de lo contrario se van acumulando los printfs
-
-                json_printf(&out1,"{ boton : %B}",false);
-
-
-
-                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                         pub_topic_json,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-                UART_PRINT("\n\r CC3200 Publishes the following message \n\r");
-                UART_PRINT("Topic: %s\n\r",pub_topic_sw2);
-                UART_PRINT("Data: %s\n\r",data_sw2);
-            }
-            else if(PUSH_BUTTON_SW3_PRESSED == RecvQue)     // Si es porque se ha pulsado el boton SW3, se envia el mensaje corresponiente
-            {
-
-                //
-                // send publish message
-                //
-                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                         pub_topic_sw3,data_sw3,strlen((char*)data_sw3),QOS2,RETAIN);
-
-                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-
-                //Reinicio out1, de lo contrario se van acumulando los printfs
-
-                json_printf(&out1,"{ boton : %B}",true);
-
-                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                         pub_topic_json,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-
-
-                UART_PRINT("\n\r CC3200 Publishes the following message \n\r");
-                UART_PRINT("Topic: %s\n\r",pub_topic_sw3);
-                UART_PRINT("Data: %s\n\r",data_sw3);
-            }
-            else if(PING_REPORT == RecvQue)             // Si es porque se debe responder al comando recibido ping, se envia el mensaje  {"ping" : true }
-            {
-                bool ping = true;
-                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-                json_printf(&out1,"{ ping : %B}", ping);
-                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                         pub_topic_ping,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-                UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-                UART_PRINT("Topic: %s\n\r",pub_topic_ping);
-                UART_PRINT("Data: %s\n\r",json_buffer);
-            }
-            else if(BUTTON_STATE_REPORT == RecvQue)     // Si es porque se debe reportar el valor de los botones, se comprueba sus estado y se envian
-            {
-                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-
-                // Button 1
-                bool button1 = GPIOPinRead(GPIOA1_BASE,GPIO_PIN_5)>>5;
-                bool button2 = GPIOPinRead(GPIOA2_BASE,GPIO_PIN_6)>>6;
-                json_printf(&out1,"{ button1 : %B,  button2 : %B}", button1, button2);
-                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                         pub_topic_checkButtons,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-                UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-                UART_PRINT("Topic: %s\n\r",pub_topic_checkButtons);
-                UART_PRINT("Data: %s\n\r",json_buffer);
-            }
-            else if(TEMP_REPORT == RecvQue)             // Si es porque se debe reportar el valor de la temperatura, se llama a la funcion que la mide y se envia
-            {
-                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-
-                double tempIR,tempAmb;
-                TMP006DrvGetTemp2(&tempIR,&tempAmb);
-                json_printf(&out1,"{ tempIR : %f,  tempAmb : %f}", (float)tempIR, (float)tempAmb);
-                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                         pub_topic_temp,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-                UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-                UART_PRINT("Topic: %s\n\r",pub_topic_temp);
-                UART_PRINT("Data: %s\n\r",json_buffer);
-            }
-            else if(ACC_REPORT == RecvQue)              // Si es porque se debe reportar el valor de la aceleracion, se llama a la funcion que la mide y se envia
-            {
-                struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-                int8_t x_acc,y_acc,z_acc;
-                BMA222ReadNew(&x_acc, &y_acc, &z_acc);
-                json_printf(&out1,"{ x_acc : %d,  y_acc : %d, z_acc : %d}", (int)x_acc, (int)y_acc, (int)z_acc);
-                sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                         pub_topic_acc,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-                UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-                UART_PRINT("Topic: %s\n\r",pub_topic_acc);
-                UART_PRINT("Data: %s\n\r",json_buffer);
-            }
-            else if(BROKER_DISCONNECTION == RecvQue)    // Si es porque se ha producido una desconexion se termina
-            {
-                iConnBroker--;
-                if(iConnBroker < 1)
-                {
-                    //
-                    // device not connected to any broker
-                    //
-                    goto end;
-                }
-            }
-        }
-    end:
-        //
-        // Deinitializating the client library
-        //
-        sl_ExtLib_MqttClientExit();
-        UART_PRINT("\n\r Exiting the Application\n\r");
-
-        //LOOP_FOREVER();
-        //Kill the task
-        OsiTaskHandle handle=NULL;
-        osi_TaskDelete(&handle);
-
-
-}
-#endif
-
 
 
 
@@ -982,7 +765,6 @@ void ConnectWiFI(void *pvParameters)
     //
     // Start the driver
     //
-#ifdef STATION_MODE
     lRetVal = Network_IF_InitDriver(ROLE_STA);
     if(lRetVal < 0)
     {
@@ -1010,40 +792,6 @@ void ConnectWiFI(void *pvParameters)
        UART_PRINT("Connection to an AP failed\n\r");
        LOOP_FOREVER();
     }
-#else
-    lRetVal = Network_IF_InitDriver(ROLE_AP);
-    if (lRetVal<0)
-        LOOP_FOREVER();
-
-    // switch on Green LED to indicate Simplelink is properly up
-    GPIO_IF_LedOn(MCU_ON_IND);
-
-    // Start Timer to blink Red LED
-    LedTimerConfigNStart();
-
-    lRetVal=sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_SSID, strlen(SSID_NAME), SSID_NAME); //Configura el SSID en modo AP...
-    if (lRetVal<0)
-            LOOP_FOREVER();
-
-    uint8_t secType=SECURITY_TYPE;
-    lRetVal = sl_WlanSet(SL_WLAN_CFG_AP_ID,
-            WLAN_AP_OPT_SECURITY_TYPE, 1,
-            (unsigned char *)&secType);
-    if (lRetVal<0) ERR_PRINT( lRetVal);
-
-    lRetVal = sl_WlanSet(SL_WLAN_CFG_AP_ID,
-            WLAN_AP_OPT_PASSWORD,
-            strlen((const char *)SECURITY_KEY),
-            (unsigned char *)SECURITY_KEY);
-    if (lRetVal<0) ERR_PRINT( lRetVal);
-
-    //Restart the network after changing access point name....
-    lRetVal = sl_Stop(0xFF);
-    if (lRetVal<0) ERR_PRINT( lRetVal);
-    lRetVal = sl_Start(0, 0, 0);
-    if (lRetVal<0) ERR_PRINT( lRetVal);
-
-#endif
 
     //
     // Disable the LED blinking Timer as Device is connected to AP
@@ -1090,16 +838,8 @@ void ConnectWiFI(void *pvParameters)
 
     osi_Sleep(10); //Espera un poco
 
-    //
-    // Vuelve a poner los pines como salida GPIO
-    // No deberia hacerlo mientras haya una transferencia I2C activa.
 
-//    MAP_PinTypeGPIO(PIN_01, PIN_MODE_0, false);
-//    MAP_GPIODirModeSet(GPIOA1_BASE, 0x4, GPIO_DIR_MODE_OUT);
-//    MAP_PinTypeGPIO(PIN_02, PIN_MODE_0, false);
-//    MAP_GPIODirModeSet(GPIOA1_BASE, 0x8, GPIO_DIR_MODE_OUT);
-
-    //HAbilitamos los timers en modo PWM (pero NO habilitamos los pines como PWM)
+    //Habilitamos los timers en modo PWM (pero NO habilitamos los pines como PWM)
     PWM_IF_Init(0);
 
 
@@ -1124,8 +864,6 @@ void ConnectWiFI(void *pvParameters)
         LOOP_FOREVER();
     }
 
-
-#ifdef STATION_MODE
     //
     // Initialze MQTT client lib
     //
@@ -1273,9 +1011,24 @@ void ConnectWiFI(void *pvParameters)
             json_printf(&out1,"{moisture : %f, temperature : %f,  humidity : %f}", (float)sensorsData_.moisture_, (float)sensorsData_.sht31Data_.temperature, (float)sensorsData_.sht31Data_.humidity);
             sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
                                      pub_topic_sensors,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+#ifdef DEBUG
             UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-                        UART_PRINT("Topic: %s\n\r",pub_topic_sensors);
-                        UART_PRINT("Data: %s\n\r",json_buffer);
+            UART_PRINT("Topic: %s\n\r",pub_topic_sensors);
+            UART_PRINT("Data: %s\n\r",json_buffer);
+#endif //DEBUG
+            // Reenviamos el mensaje para Losant
+            json_buffer[0] = 0;
+            struct json_out out2 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+            json_printf(&out2,"{data: {moisture : %f, temperature : %f,  humidity : %f}}", (float)sensorsData_.moisture_, (float)sensorsData_.sht31Data_.temperature, (float)sensorsData_.sht31Data_.humidity);
+            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                             pub_topic_losant,json_buffer,strlen((char*)json_buffer),QOS0,0);
+#ifdef DEBUG
+            UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
+            UART_PRINT("Topic: %s\n\r",pub_topic_losant);
+            UART_PRINT("Data: %s\n\r",json_buffer);
+#endif //DEBUG
+
+
         }
 
         else if(BROKER_DISCONNECTION == RecvQue)    // Si es porque se ha producido una desconexion se termina
@@ -1300,14 +1053,6 @@ end:
     LOOP_FOREVER();
 
 
-#else
-
-    // En este caso, la parte que se intenta conectar, se hace en el interprete de comandos...
-    //Se tiene que lanzar una tarea adicional, para liberar memoria destruimos esta tarea, que ya ha hecho lo que tenia que hacer
-    OsiTaskHandle handle=NULL;
-    osi_TaskDelete(&handle);
-#endif
-
 } //Fin de la funcion de la tarea ConnectWIFI
 
 
@@ -1317,15 +1062,13 @@ void measurementsTask (void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-        uint32_t samplingFreq = 60000;
+        uint32_t samplingFreq = 5000;
         xEventGroupWaitBits(measurementFlag, MEASUREMENT_START, pdFALSE, pdFALSE, portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
         osi_messages var = SENSORS_REPORT;
+//        readWaterLevel();
         osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
         xQueuePeek(freqQueue,&samplingFreq, ( TickType_t )10);
-        UART_PRINT("\n samplingFreq: %d", samplingFreq);
         osi_Sleep(samplingFreq);
-
-
     }
 }
 
@@ -1340,21 +1083,19 @@ void wateringTask (void *pvParameters)
         GPIOPinWrite(GPIOA0_BASE, 0x10, 0x10);
         osi_Sleep(( TickType_t )wateringTime);
         GPIOPinWrite(GPIOA0_BASE, 0x10, 0);
+        UART_PRINT("\n Watering for %d secs", wateringTime/1000);
         xEventGroupClearBits(waterFlag,WATERING_START);
     }
 }
 
-void waterLevelTask(void *pvParameters)
-{
-    for( ;; )                                                                       // Debemos tener un bucle infinito
-    {
-        osi_Sleep(10000);
-//        readWaterLevel();
-        float moist;
-        analogReadMoisture(&moist);
-        osi_Sleep(2000);
-    }
-}
+//void waterLevelTask(void *pvParameters)
+//{
+//    for( ;; )                                                                       // Debemos tener un bucle infinito
+//    {
+////        readWaterLevel();
+////        osi_Sleep(2000);
+//    }
+//}
 
 
 //*****************************************************************************
@@ -1477,8 +1218,6 @@ void main()
             while(1);
     }
 
-
-
     //
     // Crear las tareas
     //
@@ -1502,17 +1241,15 @@ void main()
        LOOP_FOREVER();
     }
 
-    lRetVal = osi_TaskCreate(waterLevelTask,
-                                    (const signed char *)"Water Level Task",
-                                    OSI_STACK_SIZE, NULL, 2, NULL );
-
-        if(lRetVal < 0)
-        {
-           ERR_PRINT(lRetVal);
-           LOOP_FOREVER();
-        }
-
-
+//    lRetVal = osi_TaskCreate(waterLevelTask,
+//                                    (const signed char *)"Water Level Task",
+//                                    OSI_STACK_SIZE, NULL, 2, NULL );
+//
+//        if(lRetVal < 0)
+//        {
+//           ERR_PRINT(lRetVal);
+//           LOOP_FOREVER();
+//        }
 
     //
     // Start the task scheduler

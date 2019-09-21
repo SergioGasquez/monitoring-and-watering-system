@@ -25,14 +25,16 @@ int analogReadMoisture(float *moisture)
 
     *moisture = ulSample * (1.467/4096);
 
-    if(*moisture < 0 || *moisture > 1.4)
+    if(*moisture < 0 || *moisture > 1.5)
     {
         return FAILURE;
     }
     else
     {
-//        Report("\n moisture voltage = %f  \n" , *moisture);
-        *moisture =  (*moisture*100)/1.4;
+#ifdef DEBUG_MOISTURESENSOR
+        Report("\n moisture voltage = %f  \n" , *moisture);
+#endif //DEBUG_MOISTURESENSOR
+        *moisture =  (float)100 - ((*moisture*100)/1.4);
         return SUCCESS;
     }
 
