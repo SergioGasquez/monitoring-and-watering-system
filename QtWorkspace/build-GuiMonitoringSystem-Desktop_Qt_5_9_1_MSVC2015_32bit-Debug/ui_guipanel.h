@@ -358,7 +358,7 @@ public:
         secondsLabel->setPlainText(QApplication::translate("GUIPanel", "Seconds", Q_NULLPTR));
         tempUnitsLabel->setPlainText(QApplication::translate("GUIPanel", "\302\272C", Q_NULLPTR));
         moistUnitsLabel->setPlainText(QApplication::translate("GUIPanel", "%", Q_NULLPTR));
-        warningLabel->setPlainText(QApplication::translate("GUIPanel", "WARNING: The watering will be activated if the temperature raises above the threshold and the moisture is under the threshold.", Q_NULLPTR));
+        warningLabel->setPlainText(QApplication::translate("GUIPanel", "WARNING: The watering will be activated if the temperature rises above the threshold and the moisture is under the threshold.", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(waterTab), QApplication::translate("GUIPanel", "Watering", Q_NULLPTR));
         startLabel->setPlainText(QApplication::translate("GUIPanel", "Measurements: ", Q_NULLPTR));
         onLabel->setPlainText(QApplication::translate("GUIPanel", "On", Q_NULLPTR));
