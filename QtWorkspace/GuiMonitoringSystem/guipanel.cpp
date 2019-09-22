@@ -23,7 +23,6 @@
 
 constexpr const char * TOPIC_PC                     = "/PC";       // Topic en el que se publican los mensajes de PC a CC3200
 constexpr const char * TOPIC_CC3200                 = "/cc3200/#"; // Topic en el que recibiremos los mensajes de CC3200. Al usar #, nos subscribimos a todos sus subtopics
-
 /*
 // Subtopics (no se usan porque se subscribe solo al topic superior)
 constexpr const char * TOPIC_SENSORS                    = "/cc3200/Station1";
@@ -227,7 +226,11 @@ void GUIPanel::onMQTT_Received(const QMQTT::Message &message)
                 ui->moistureGraph->replot();
 
                 saveData(temperature.toDouble(), humidity.toDouble(), moisture.toDouble());
-
+            }
+            QJsonValue waterLevel = objeto_json["waterLevel"];
+            if (waterLevel != QJsonValue::Null)
+            {
+                ui->waterLevel->setValue(waterLevel.toDouble());
             }
 
         }
@@ -320,8 +323,6 @@ void GUIPanel::saveData(double temperature, double humidity, double moisture)
         os.flush();
     }
 }
-
-
 // SLOT asociada a pulsación del botón Start
 void GUIPanel::on_connectButton_clicked()
 {
@@ -390,6 +391,7 @@ void GUIPanel::on_waterParamsSet_clicked()
         ventanaPopUp.exec();
     }
 }
+
 
 //Envia el valor de frecuencia de medicion de la temperatura cuando se cambia su valor desde la interfaz
 void GUIPanel::on_freq_valueChanged(double value)

@@ -131,7 +131,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>3</number>
+    <number>0</number>
    </property>
    <widget class="QWidget" name="generalTab">
     <attribute name="title">
@@ -184,6 +184,9 @@
       </property>
       <property name="value">
        <double>0.000000000000000</double>
+      </property>
+      <property name="nominal">
+       <double>150.000000000000000</double>
       </property>
       <property name="suffix">
        <string> [ºC]</string>
@@ -262,6 +265,12 @@
       <property name="value">
        <double>0.000000000000000</double>
       </property>
+      <property name="nominal">
+       <double>150.000000000000000</double>
+      </property>
+      <property name="critical">
+       <double>90.000000000000000</double>
+      </property>
       <property name="suffix">
        <string> [%]</string>
       </property>
@@ -321,6 +330,12 @@
       <property name="value">
        <double>0.000000000000000</double>
       </property>
+      <property name="nominal">
+       <double>150.000000000000000</double>
+      </property>
+      <property name="critical">
+       <double>80.000000000000000</double>
+      </property>
       <property name="suffix">
        <string> [%]</string>
       </property>
@@ -379,6 +394,12 @@
       </property>
       <property name="value">
        <double>0.000000000000000</double>
+      </property>
+      <property name="nominal">
+       <double>150.000000000000000</double>
+      </property>
+      <property name="critical">
+       <double>150.000000000000000</double>
       </property>
       <property name="suffix">
        <string> [%]</string>
@@ -492,7 +513,7 @@
     <widget class="QPushButton" name="waterButton">
      <property name="geometry">
       <rect>
-       <x>640</x>
+       <x>540</x>
        <y>100</y>
        <width>121</width>
        <height>51</height>
@@ -510,8 +531,8 @@
     <widget class="QPushButton" name="waterParamsSet">
      <property name="geometry">
       <rect>
-       <x>630</x>
-       <y>310</y>
+       <x>550</x>
+       <y>340</y>
        <width>171</width>
        <height>71</height>
       </rect>
@@ -574,7 +595,7 @@
     <widget class="QwtSlider" name="waterTimeSlider">
      <property name="geometry">
       <rect>
-       <x>130</x>
+       <x>50</x>
        <y>80</y>
        <width>431</width>
        <height>61</height>

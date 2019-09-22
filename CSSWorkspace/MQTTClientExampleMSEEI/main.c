@@ -168,6 +168,7 @@ typedef struct connection_config{
 typedef enum events
 {
     SENSORS_REPORT,
+    WATER_REPORT,
     BROKER_DISCONNECTION
 }osi_messages;
 
@@ -178,11 +179,7 @@ void vUARTTask( void *pvParameters );
 
 /////////////////////////////////////////////////////
 
-int echowait = 0;
-volatile int pulse= 0;
 volatile unsigned long timerValue = 0;
- volatile unsigned long timerValue1;
- volatile unsigned long timerValue2;
 
 static QueueHandle_t freqQueue;             // Cola que almacena la frecuencia con la que se mide
 static QueueHandle_t thresholdsQueue;       // Cola que almacena los thresholds
@@ -208,7 +205,6 @@ typedef struct {                                    // Struct para almacenar los
 typedef struct {                                    // Struct para almacenar los envios
     sht31Data sht31Data_;
     float moisture_;
-    float waterLevel_;
 }sensorsData;
 
 ////////////////////////////////////////////////////
@@ -302,6 +298,7 @@ const char *pub_topic_losant = PUB_TOPIC_LOSANT;
 
 
 
+
 void *app_hndl = (void*)usr_connect_config;
 //*****************************************************************************
 //                 GLOBAL VARIABLES -- End
@@ -371,7 +368,6 @@ Mqtt_Recv(void *app_hndl, const char  *topstr, long top_len, const void *payload
             xQueueOverwrite(thresholdsQueue,&systemThresholds_);
         }
 
-
     }
     if (strncmp(output_str,TOPIC_LOSANT, top_len) == 0)                                     // Si recibimos un mensaje de Losant - Realizamos las mismas comprobaciones
     {
@@ -392,35 +388,47 @@ Mqtt_Recv(void *app_hndl, const char  *topstr, long top_len, const void *payload
                 {
                     xEventGroupClearBits(measurementFlag, MEASUREMENT_START);
                 }
+#ifdef DEBUG
+                UART_PRINT("\measurementSwitch: %d", (int)boolean);
+#endif //DEBUG
+
             }
             if (json_scanf((const char *)aux, pay_len, "{ measuresFreq: %d }", &freq)>0)
             {
                 freq = freq*1000*60;
                 xQueueOverwrite(freqQueue,&freq);
+#ifdef DEBUG
+                UART_PRINT("\nmeasuresFreq: %d", freq);
+#endif //DEBUG
+
             }
             if (json_scanf((const char *)aux, pay_len, "{ wateringTime: %d }", &value)>0)
             {
                 value = value *1000;
                 xQueueOverwrite(waterQueue,&value);
                 xEventGroupSetBits(waterFlag,WATERING_START);
+#ifdef DEBUG
+                UART_PRINT("\Watering Time: %d", value);
+#endif //DEBUG
             }
             if (json_scanf((const char *)aux, pay_len, "{ temperatureThreshold: %d }", &value)>0)
             {
                 systemThresholds_.temperature = value;
                 xQueueOverwrite(thresholdsQueue,&systemThresholds_);
+#ifdef DEBUG
+        UART_PRINT("\nsystemThresholds temeperature: %d", systemThresholds_.temperature);
+#endif //DEBUG
             }
             if (json_scanf((const char *)aux, pay_len, "{ moistureThreshold: %d }", &value)>0)
             {
                 systemThresholds_.moisture = value;
                 xQueueOverwrite(thresholdsQueue,&systemThresholds_);
-            }
-        }
 #ifdef DEBUG
-        UART_PRINT("\measurementSwitch: %d", (int)boolean);
-        UART_PRINT("\nmeasuresFreq: %d", freq);
-        UART_PRINT("\nsystemThresholds temeperature: %d", systemThresholds_.temperature);
         UART_PRINT("\nsystemThresholds moisture: %d", systemThresholds_.moisture);
 #endif //DEBUG
+            }
+        }
+
     }
 
     // Publicamos por la consola el mensaje publicado
@@ -713,7 +721,7 @@ DisplayBanner(char * AppName)
 
 
 //GLOBAL PARA DE MOMENTO NO GASTAR PILA (CUIDADO!!!)
-char json_buffer[100];
+char json_buffer[110];
 //struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
 
 
@@ -999,6 +1007,7 @@ void ConnectWiFI(void *pvParameters)
         {
             sensorsData sensorsData_;
             systemThresholds systemThresholds_;
+            uint8_t i = 0;
             // Moisture
             struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
             getTemperature(&sensorsData_.sht31Data_.temperature, &sensorsData_.sht31Data_.humidity);
@@ -1008,6 +1017,7 @@ void ConnectWiFI(void *pvParameters)
             {
                 xEventGroupSetBits(waterFlag,WATERING_START);
             }
+
             json_printf(&out1,"{moisture : %f, temperature : %f,  humidity : %f}", (float)sensorsData_.moisture_, (float)sensorsData_.sht31Data_.temperature, (float)sensorsData_.sht31Data_.humidity);
             sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
                                      pub_topic_sensors,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
@@ -1023,14 +1033,44 @@ void ConnectWiFI(void *pvParameters)
             sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
                              pub_topic_losant,json_buffer,strlen((char*)json_buffer),QOS0,0);
 #ifdef DEBUG
-            UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
             UART_PRINT("Topic: %s\n\r",pub_topic_losant);
             UART_PRINT("Data: %s\n\r",json_buffer);
 #endif //DEBUG
 
 
         }
+        if(WATER_REPORT== RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
+        {
+            float waterLevel = 0;
+            uint8_t i = 0;
+            for ( i =0; i < 5; i++)
+            {
+                waterLevel += readWaterLevel();
+                osi_Sleep(200);
+            }
 
+            waterLevel = waterLevel/5;
+            struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+            json_printf(&out1,"{waterLevel : %f}", waterLevel);
+            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                                    pub_topic_sensors,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
+#ifdef DEBUG
+            UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
+            UART_PRINT("Topic: %s\n\r",pub_topic_sensors);
+            UART_PRINT("Data: %s\n\r",json_buffer);
+#endif //DEBUG
+            // Reenviamos el mensaje para Losant
+            json_buffer[0] = 0;
+            struct json_out out2 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
+            json_printf(&out2,"{data: {waterLevel : %f}}", waterLevel);
+            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
+                            pub_topic_losant,json_buffer,strlen((char*)json_buffer),QOS0,0);
+#ifdef DEBUG
+            UART_PRINT("Topic: %s\n\r",pub_topic_losant);
+            UART_PRINT("Data: %s\n\r",json_buffer);
+#endif //DEBUG
+
+        }
         else if(BROKER_DISCONNECTION == RecvQue)    // Si es porque se ha producido una desconexion se termina
         {
             iConnBroker--;
@@ -1062,10 +1102,9 @@ void measurementsTask (void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-        uint32_t samplingFreq = 5000;
+        uint32_t samplingFreq = 60000;
         xEventGroupWaitBits(measurementFlag, MEASUREMENT_START, pdFALSE, pdFALSE, portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
         osi_messages var = SENSORS_REPORT;
-//        readWaterLevel();
         osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
         xQueuePeek(freqQueue,&samplingFreq, ( TickType_t )10);
         osi_Sleep(samplingFreq);
@@ -1075,27 +1114,22 @@ void measurementsTask (void *pvParameters)
 
 void wateringTask (void *pvParameters)
 {
+    osi_messages var = WATER_REPORT;
+    osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
-        uint32_t wateringTime = 10000;
+        uint32_t wateringTime = 5000;
         xEventGroupWaitBits(waterFlag, WATERING_START, pdFALSE, pdFALSE, portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
         xQueuePeek(waterQueue, &wateringTime, ( TickType_t )10);
         GPIOPinWrite(GPIOA0_BASE, 0x10, 0x10);
         osi_Sleep(( TickType_t )wateringTime);
         GPIOPinWrite(GPIOA0_BASE, 0x10, 0);
         UART_PRINT("\n Watering for %d secs", wateringTime/1000);
+        osi_messages var = WATER_REPORT;
+        osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
         xEventGroupClearBits(waterFlag,WATERING_START);
     }
 }
-
-//void waterLevelTask(void *pvParameters)
-//{
-//    for( ;; )                                                                       // Debemos tener un bucle infinito
-//    {
-////        readWaterLevel();
-////        osi_Sleep(2000);
-//    }
-//}
 
 
 //*****************************************************************************
@@ -1240,16 +1274,6 @@ void main()
        ERR_PRINT(lRetVal);
        LOOP_FOREVER();
     }
-
-//    lRetVal = osi_TaskCreate(waterLevelTask,
-//                                    (const signed char *)"Water Level Task",
-//                                    OSI_STACK_SIZE, NULL, 2, NULL );
-//
-//        if(lRetVal < 0)
-//        {
-//           ERR_PRINT(lRetVal);
-//           LOOP_FOREVER();
-//        }
 
     //
     // Start the task scheduler

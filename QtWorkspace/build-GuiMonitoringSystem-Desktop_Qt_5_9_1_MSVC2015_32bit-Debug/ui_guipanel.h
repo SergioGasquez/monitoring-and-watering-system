@@ -130,6 +130,7 @@ public:
         temperature->setMinimum(5);
         temperature->setMaximum(60);
         temperature->setValue(0);
+        temperature->setNominal(150);
         temperature->setValueOffset(275);
         temperature->setDigitOffset(10);
         labelTemperature = new QLabel(groupAmbient);
@@ -147,6 +148,8 @@ public:
         humidity->setMinimum(20);
         humidity->setMaximum(80);
         humidity->setValue(0);
+        humidity->setNominal(150);
+        humidity->setCritical(90);
         humidity->setValueOffset(276);
         humidity->setDigitOffset(10);
         groupMoisture = new QGroupBox(generalTab);
@@ -160,6 +163,8 @@ public:
         moisture->setMinimum(0);
         moisture->setMaximum(100);
         moisture->setValue(0);
+        moisture->setNominal(150);
+        moisture->setCritical(80);
         moisture->setValueOffset(275);
         moisture->setDigitOffset(10);
         groupWaterLevel = new QGroupBox(generalTab);
@@ -173,6 +178,8 @@ public:
         waterLevel->setMinimum(0);
         waterLevel->setMaximum(100);
         waterLevel->setValue(0);
+        waterLevel->setNominal(150);
+        waterLevel->setCritical(150);
         waterLevel->setValueOffset(275);
         waterLevel->setDigitOffset(10);
         freqLabel = new QLabel(generalTab);
@@ -210,11 +217,11 @@ public:
         waterTab->setObjectName(QStringLiteral("waterTab"));
         waterButton = new QPushButton(waterTab);
         waterButton->setObjectName(QStringLiteral("waterButton"));
-        waterButton->setGeometry(QRect(640, 100, 121, 51));
+        waterButton->setGeometry(QRect(540, 100, 121, 51));
         waterButton->setFont(font);
         waterParamsSet = new QPushButton(waterTab);
         waterParamsSet->setObjectName(QStringLiteral("waterParamsSet"));
-        waterParamsSet->setGeometry(QRect(630, 310, 171, 71));
+        waterParamsSet->setGeometry(QRect(550, 340, 171, 71));
         waterParamsSet->setFont(font);
         waterTimeLabel = new QwtTextLabel(waterTab);
         waterTimeLabel->setObjectName(QStringLiteral("waterTimeLabel"));
@@ -232,7 +239,7 @@ public:
         waterParamsLabel->setIndent(6);
         waterTimeSlider = new QwtSlider(waterTab);
         waterTimeSlider->setObjectName(QStringLiteral("waterTimeSlider"));
-        waterTimeSlider->setGeometry(QRect(130, 80, 431, 61));
+        waterTimeSlider->setGeometry(QRect(50, 80, 431, 61));
         waterTimeSlider->setUpperBound(60);
         waterTimeSlider->setOrientation(Qt::Horizontal);
         waterTemperatureSlider = new QwtSlider(waterTab);
@@ -296,7 +303,7 @@ public:
 
         retranslateUi(GUIPanel);
 
-        tabWidget->setCurrentIndex(3);
+        tabWidget->setCurrentIndex(0);
 
 
         QMetaObject::connectSlotsByName(GUIPanel);

@@ -24,7 +24,7 @@
 // Pins
 #define HARD_RESET_PIN
 // Address
-#define TEMPERATURE_DEV_ADDR 0x44 //(addrs pin 2 conected to Vss)
+#define TEMPERATURE_DEV_ADDR 0x44       //(addrs pin 2 conected to Vss)
 
 // Commands
 #define SOFT_RESET 0x30A2
