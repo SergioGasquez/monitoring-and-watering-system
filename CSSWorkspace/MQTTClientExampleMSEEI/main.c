@@ -1007,13 +1007,15 @@ void ConnectWiFI(void *pvParameters)
         {
             sensorsData sensorsData_;
             systemThresholds systemThresholds_;
+            systemThresholds_.temperature = 0;
+            systemThresholds_.moisture = 0;
             uint8_t i = 0;
             // Moisture
             struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
             getTemperature(&sensorsData_.sht31Data_.temperature, &sensorsData_.sht31Data_.humidity);
             analogReadMoisture(&sensorsData_.moisture_);
             xQueuePeek(thresholdsQueue, &systemThresholds_, ( TickType_t )10);
-            if((float)(systemThresholds_.temperature) <= sensorsData_.sht31Data_.temperature && (float)systemThresholds_.moisture >= sensorsData_.moisture_)
+            if((float)(systemThresholds_.temperature) >= sensorsData_.sht31Data_.temperature && (float)systemThresholds_.moisture >= sensorsData_.moisture_)
             {
                 xEventGroupSetBits(waterFlag,WATERING_START);
             }
@@ -1033,8 +1035,8 @@ void ConnectWiFI(void *pvParameters)
             sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
                              pub_topic_losant,json_buffer,strlen((char*)json_buffer),QOS0,0);
 #ifdef DEBUG
-            UART_PRINT("Topic: %s\n\r",pub_topic_losant);
-            UART_PRINT("Data: %s\n\r",json_buffer);
+//            UART_PRINT("Topic: %s\n\r",pub_topic_losant);
+//            UART_PRINT("Data: %s\n\r",json_buffer);
 #endif //DEBUG
 
 
@@ -1066,8 +1068,8 @@ void ConnectWiFI(void *pvParameters)
             sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
                             pub_topic_losant,json_buffer,strlen((char*)json_buffer),QOS0,0);
 #ifdef DEBUG
-            UART_PRINT("Topic: %s\n\r",pub_topic_losant);
-            UART_PRINT("Data: %s\n\r",json_buffer);
+//            UART_PRINT("Topic: %s\n\r",pub_topic_losant);
+//            UART_PRINT("Data: %s\n\r",json_buffer);
 #endif //DEBUG
 
         }

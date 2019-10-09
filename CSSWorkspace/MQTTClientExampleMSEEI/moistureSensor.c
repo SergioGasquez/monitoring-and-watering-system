@@ -33,8 +33,9 @@ int analogReadMoisture(float *moisture)
     {
 #ifdef DEBUG_MOISTURESENSOR
         Report("\n moisture voltage = %f  \n" , *moisture);
+        Report("\n Percentage = %f  \n" , ((float)100 - ((*moisture*100))));
 #endif //DEBUG_MOISTURESENSOR
-        *moisture =  (float)100 - ((*moisture*100)/1.4);
+        *moisture =  (float)10 + ((*moisture*100));
         return SUCCESS;
     }
 
