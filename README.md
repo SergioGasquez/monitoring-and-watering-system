@@ -3,6 +3,13 @@
  
  ![Prototype]( https://i.imgur.com/fQ1lwO4.jpg "Prototype")
  
- Microcontroller code can be found at CSSWorkspace directory. A Qt Interface and a web interface have been developed, Qt interface can be found over QtWorkspace while web interface can be found at [Losant website developed for this pourpose](https://tfm-sergiogasquez.onlosant.com/), credentials are needed (test.user@example.com ; 12345678)
+ * Microcontroller code can be found at CSSWorkspace directory.
+ * Qt Interface can be found at QtWorkspace directory.
+ * Web Aplicantion can be found at [Losant website developed for this pourpose](https://tfm-sergiogasquez.onlosant.com/), credentials are needed (test.user@example.com ; 12345678)
+ * Documentation directory includes the datasheet and documents of every module of the system.
+ * The report directory has the report created for the proyec which, sadly, is in Spanish (dont hessitate to reach me if you have any question)
+ * The file mosquito.conf hold the configuration used for the Mosquitto broker which includes the bridge to Losant broker.
  
+ 
+
  
