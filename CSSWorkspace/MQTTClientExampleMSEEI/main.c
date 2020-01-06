@@ -11,12 +11,6 @@
 //
 //*****************************************************************************
 //*****************************************************************************
-// Modificado, adaptado y ampliado por Jose Manuel Cano, Eva Gonzalez, Ignacio Herrero
-// Departamento de Tecnologia Electronica
-// Universidad de Malaga
-//*****************************************************************************
-//
-//*****************************************************************************
 
 //*****************************************************************************
 //
@@ -93,21 +87,21 @@
 #define DEBUG
 
 /*Operate Lib in MQTT 3.1 mode.*/
-#define MQTT_3_1_1              false /*MQTT 3.1.1 */
-#define MQTT_3_1                true /*MQTT 3.1*/
+#define MQTT_3_1_1              true /*MQTT 3.1.1 */
+#define MQTT_3_1                false /*MQTT 3.1*/
 
 #define WILL_TOPIC              "Client"
 #define WILL_MSG                "Client Stopped"
-#define WILL_QOS                QOS2
+#define WILL_QOS                QOS0
 #define WILL_RETAIN             false
 
 /*Defining Broker IP address and port Number*/
-#define SERVER_ADDRESS          "192.168.1.38"      // IP del PC (Broker MQTT)
+#define SERVER_ADDRESS          "broker.losant.com"      // Direccion del seridor MQTT
 #define PORT_NUMBER             1883
 
 #define MAX_BROKER_CONN         1
 
-#define SERVER_MODE             MQTT_3_1
+#define SERVER_MODE             MQTT_3_1_1 // MQTT_3_1
 /*Specifying Receive time out for the Receive task*/
 #define RCV_TIMEOUT             30
 
@@ -121,23 +115,19 @@
 #define CLEAN_SESSION           true
 
 /*Retain Flag. Used in publish message. */
-#define RETAIN                  1
+#define RETAIN                  0
 
 /*Topics a los que va a publicar*/
-#define PUB_TOPIC_SENSORS  "/cc3200/Station1"
-#define PUB_TOPIC_LOSANT    "losant/5d8236ee68f6a70006d4a026/state"
+#define PUB_TOPIC_LOSANT    "losant/5dd6edbdaefa7f0008c2bea8/state"
 
 /*Numero de topics a los que se va a subscribir*/
-#define TOPIC_COUNT             2
+#define TOPIC_COUNT             1
 
 /*Defining Subscription Topic Values*/
-#define TOPIC_PC                "/PC"
-#define TOPIC_LOSANT            "losant/5d8236ee68f6a70006d4a026/command"
+#define TOPIC_LOSANT            "losant/5dd6edbdaefa7f0008c2bea8/command"
 
 
 #define RELAY_PIN PIN_59
-
-
 
 /*Defining QOS levels*/
 #define QOS0                    0
@@ -266,15 +256,15 @@ connect_config usr_connect_config[] =
             true,
         },
         NULL,
-        (unsigned char *)"user1",
-        NULL,
-        NULL,
+        (unsigned char *)"5dd6edbdaefa7f0008c2bea8",//(unsigned char *)"user1",
+        (unsigned char *)"28cf1c96-5a43-4193-a348-5b13e2942fcc",//NULL,
+        (unsigned char *)"9b5d740188a2f0c797fe800cfc06ef31b5b165798426fa4eee4436b7e6f6e974",//NULL,
         true,
         KEEP_ALIVE_TIMER,
         {Mqtt_Recv, sl_MqttEvt, sl_MqttDisconnect},
         TOPIC_COUNT,
-        {TOPIC_PC,TOPIC_LOSANT},             // Nos subscribimos al topic del PC
-        {QOS2},                 // Con calidad de servicio 2
+        {TOPIC_LOSANT},             // Nos subscribimos al topic de Losant
+        {QOS0},                     // Con calidad de servicio 0
         {WILL_TOPIC,WILL_MSG,WILL_QOS,WILL_RETAIN},
         false
     }
@@ -290,7 +280,6 @@ SlMqttClientLibCfg_t Mqtt_Client={
 };
 
 /*Conversion a char* de los topics en los que publicaremos*/
-const char *pub_topic_sensors = PUB_TOPIC_SENSORS;
 const char *pub_topic_losant = PUB_TOPIC_LOSANT;
 
 
@@ -331,44 +320,6 @@ Mqtt_Recv(void *app_hndl, const char  *topstr, long top_len, const void *payload
     memset(output_str,'\0',top_len+1);
     strncpy(output_str, (char*)topstr, top_len);
     output_str[top_len]='\0';
-    if (strncmp(output_str,TOPIC_PC, top_len) == 0)                         // Si recibimos un mensaje de la interfaz de PC
-    {
-        systemThresholds systemThresholds_;
-        uint32_t value;
-        if (json_scanf((const char *)payload, pay_len, "{ measuresFreq: %d }", &value)>0)         // Si recibimos un mensaje de cambio de frecuencia de muestreo
-        {
-            value = value*1000*60;
-            xQueueOverwrite(freqQueue,&value);
-        }
-        if (json_scanf((const char *)payload, pay_len, "{ measurementSwitch: %d }", &value)>0)         // Si recibimos un mensaje de pausar/reunadar las medidas
-        {
-            if(value)
-            {
-                xEventGroupSetBits(measurementFlag, MEASUREMENT_START);
-            }
-            else
-            {
-                xEventGroupClearBits(measurementFlag, MEASUREMENT_START);
-            }
-        }
-        if (json_scanf((const char *)payload, pay_len, "{ wateringTime: %d }", &value)>0)         // Si recibimos un mensaje de cambio de tiempo de riego
-        {
-            value = value *1000;
-            xQueueOverwrite(waterQueue,&value);
-            xEventGroupSetBits(waterFlag,WATERING_START);
-        }
-        if (json_scanf((const char *)payload, pay_len, "{ temperatureThreshold: %d }", &value)>0)         // Si recibimos un mensaje de cambio de umbral de temperatura
-        {
-            systemThresholds_.temperature = value;
-            xQueueOverwrite(thresholdsQueue,&systemThresholds_);
-        }
-        if (json_scanf((const char *)payload, pay_len, "{ moistureThreshold: %d }", &value)>0)         // Si recibimos un mensaje de cambio de umbral de humedad en suelo
-        {
-            systemThresholds_.moisture = value;
-            xQueueOverwrite(thresholdsQueue,&systemThresholds_);
-        }
-
-    }
     if (strncmp(output_str,TOPIC_LOSANT, top_len) == 0)                                     // Si recibimos un mensaje de Losant - Realizamos las mismas comprobaciones
     {
         systemThresholds systemThresholds_;
@@ -721,12 +672,7 @@ DisplayBanner(char * AppName)
 
 
 //GLOBAL PARA DE MOMENTO NO GASTAR PILA (CUIDADO!!!)
-char json_buffer[110];
-//struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-
-
-
-
+char json_buffer[150];
 
 
 //*****************************************************************************
@@ -1003,7 +949,7 @@ void ConnectWiFI(void *pvParameters)
         osi_MsgQRead( &g_PBQueue, &RecvQue, OSI_WAIT_FOREVER);                  // Funcion bloqueante que espera a que haya algun mensaje en la cola de salida
                                                                                 // Cuando llega algun mensaje lo guardamos en RecvQue
         // Comrpobamosque tipo de mensaje es
-        if(SENSORS_REPORT== RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
+        if(SENSORS_REPORT== RecvQue)
         {
             sensorsData sensorsData_;
             systemThresholds systemThresholds_;
@@ -1019,29 +965,16 @@ void ConnectWiFI(void *pvParameters)
             {
                 xEventGroupSetBits(waterFlag,WATERING_START);
             }
-
-            json_printf(&out1,"{moisture : %f, temperature : %f,  humidity : %f}", (float)sensorsData_.moisture_, (float)sensorsData_.sht31Data_.temperature, (float)sensorsData_.sht31Data_.humidity);
-            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                     pub_topic_sensors,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-#ifdef DEBUG
-            UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-            UART_PRINT("Topic: %s\n\r",pub_topic_sensors);
-            UART_PRINT("Data: %s\n\r",json_buffer);
-#endif //DEBUG
-            // Reenviamos el mensaje para Losant
-            json_buffer[0] = 0;
-            struct json_out out2 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-            json_printf(&out2,"{data: {moisture : %f, temperature : %f,  humidity : %f}}", (float)sensorsData_.moisture_, (float)sensorsData_.sht31Data_.temperature, (float)sensorsData_.sht31Data_.humidity);
+            json_printf(&out1,"{data: {moisture : %f, temperature : %f,  humidity : %f}}", (float)sensorsData_.moisture_, (float)sensorsData_.sht31Data_.temperature, (float)sensorsData_.sht31Data_.humidity);
             sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
                              pub_topic_losant,json_buffer,strlen((char*)json_buffer),QOS0,0);
 #ifdef DEBUG
-//            UART_PRINT("Topic: %s\n\r",pub_topic_losant);
-//            UART_PRINT("Data: %s\n\r",json_buffer);
+            UART_PRINT("Topic: %s\n\r",pub_topic_losant);
+            UART_PRINT("Data: %s\n\r",json_buffer);
 #endif //DEBUG
 
-
         }
-        if(WATER_REPORT== RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
+        if(WATER_REPORT == RecvQue)              // Si es porque se ha pulsado el boton SW2, se envia el mensaje corresponiente
         {
             float waterLevel = 0;
             uint8_t i = 0;
@@ -1052,24 +985,14 @@ void ConnectWiFI(void *pvParameters)
             }
 
             waterLevel = waterLevel/5;
+
             struct json_out out1 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-            json_printf(&out1,"{waterLevel : %f}", waterLevel);
-            sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
-                                    pub_topic_sensors,json_buffer,strlen((char*)json_buffer),QOS2,RETAIN);
-#ifdef DEBUG
-            UART_PRINT("\n\r CC3200 Publishes the following message\n\r");
-            UART_PRINT("Topic: %s\n\r",pub_topic_sensors);
-            UART_PRINT("Data: %s\n\r",json_buffer);
-#endif //DEBUG
-            // Reenviamos el mensaje para Losant
-            json_buffer[0] = 0;
-            struct json_out out2 = JSON_OUT_BUF(json_buffer, sizeof(json_buffer));
-            json_printf(&out2,"{data: {waterLevel : %f}}", waterLevel);
+            json_printf(&out1,"{data: {waterLevel : %f}}", waterLevel);
             sl_ExtLib_MqttClientSend((void*)local_con_conf[iCount].clt_ctx,
                             pub_topic_losant,json_buffer,strlen((char*)json_buffer),QOS0,0);
 #ifdef DEBUG
-//            UART_PRINT("Topic: %s\n\r",pub_topic_losant);
-//            UART_PRINT("Data: %s\n\r",json_buffer);
+            UART_PRINT("Topic: %s\n\r",pub_topic_losant);
+            UART_PRINT("Data: %s\n\r",json_buffer);
 #endif //DEBUG
 
         }
@@ -1104,12 +1027,18 @@ void measurementsTask (void *pvParameters)
 {
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
+        /*
         uint32_t samplingFreq = 60000;
         xEventGroupWaitBits(measurementFlag, MEASUREMENT_START, pdFALSE, pdFALSE, portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
         osi_messages var = SENSORS_REPORT;
         osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
         xQueuePeek(freqQueue,&samplingFreq, ( TickType_t )10);
         osi_Sleep(samplingFreq);
+        */
+        osi_Sleep(5000);
+        float moist;
+        analogReadMoisture(&moist);
+        UART_PRINT("\n Res %f ", moist);
     }
 }
 
@@ -1121,7 +1050,7 @@ void wateringTask (void *pvParameters)
     for( ;; )                                                                       // Debemos tener un bucle infinito
     {
         uint32_t wateringTime = 5000;
-        xEventGroupWaitBits(waterFlag, WATERING_START, pdFALSE, pdFALSE, portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
+        // xEventGroupWaitBits(waterFlag, WATERING_START, pdFALSE, pdFALSE, portMAX_DELAY);                         // Funcion bloqueante que espera a que se active el flag,no resetea los flags al salir y no espera todos los flags. Espera infinto
         xQueuePeek(waterQueue, &wateringTime, ( TickType_t )10);
         GPIOPinWrite(GPIOA0_BASE, 0x10, 0x10);
         osi_Sleep(( TickType_t )wateringTime);
@@ -1129,7 +1058,7 @@ void wateringTask (void *pvParameters)
         UART_PRINT("\n Watering for %d secs", wateringTime/1000);
         osi_messages var = WATER_REPORT;
         osi_MsgQWrite(&g_PBQueue,&var,OSI_NO_WAIT);
-        xEventGroupClearBits(waterFlag,WATERING_START);
+        // xEventGroupClearBits(waterFlag,WATERING_START);
     }
 }
 

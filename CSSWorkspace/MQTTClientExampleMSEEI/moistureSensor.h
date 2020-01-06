@@ -36,7 +36,7 @@
 
 #define MOISTURE_SENSOR_PIN     PIN_58
 
-//#define DEBUG_MOISTURESENSOR
+// #define DEBUG_MOISTURESENSOR
 
 
 #ifdef __cplusplus

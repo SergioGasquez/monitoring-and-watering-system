@@ -3397,7 +3397,7 @@ static portTASK_FUNCTION( prvIdleTask, pvParameters )
 			}
 		}
 		#endif /* configUSE_TICKLESS_IDLE */
-	}
+  	}
 }
 /*-----------------------------------------------------------*/
 
